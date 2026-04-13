@@ -870,13 +870,8 @@ app.post('/verify', async (req, res) => {
   }
   }
   
-  res.json({
-    success: true,
-    checkIn,
-    blockchain: blockchainResult,
-    message: 'Check-in verified and NFT minted!'
-  });
-});
+ 
+);
 
 app.post('/demo/generate', (req, res) => {
   res.json({
