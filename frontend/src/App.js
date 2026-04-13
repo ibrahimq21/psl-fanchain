@@ -113,7 +113,7 @@ function App() {
     setConnecting(true);
     setMessage('');
     try {
-      if (!window.ethereum) {
+      if (window.ethereum) {
         // Request account access
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
 
