@@ -6,12 +6,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://your-backend-url.com/$1"
+      "destination": "https://psl-fanchain.onrender.com/$1"
     }
-  ],
-  "env": {
-    "REACT_APP_API_URL": "@react-app-api-url",
-    "REACT_APP_WIREFLUID_RPC": "@react-app-wirefluid-rpc",
-    "REACT_APP_CONTRACT_ADDRESS": "@react-app-contract-address"
-  }
+  ]
 }
