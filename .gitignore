@@ -3,16 +3,23 @@ node_modules/
 .pnp
 .pnp.js
 
-# Build
+# Build outputs
 build/
 dist/
 
-# Environment
+# Environment variables (NEVER commit)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+*.env
+
+# Secrets & Keys (NEVER commit)
+*.pem
+*.key
+*secret*
+*private*
 
 # Logs
 logs
@@ -35,16 +42,12 @@ Thumbs.db
 *.sqlite
 *.db
 
-# Private keys (keep example)
-*.pem
-*.key
-
-# ABI / Artifacts (optional - can regenerate)
+# ABI / Artifacts (regenerate via truffle compile)
 # build/
 
-# Test
+# Coverage
 coverage/
 
-# Temporary
+# Temp
 tmp/
 temp/
