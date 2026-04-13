@@ -708,20 +708,7 @@ app.get('/nfts/:id/share', (req, res) => {
   res.status(404).json({ error: 'NFT not found' });
 });
 
-// ==================== BLOCKCHAIN (Mock) ====================
 
-app.get('/blockchain/status', (req, res) => {
-  res.json({ network: 'WireFluid (Mock)', status: 'connected', tps: 2500 });
-});
-
-app.post('/blockchain/record', (req, res) => {
-  const { wallet, campaignId, proofHash } = req.body;
-  res.json({
-    success: true,
-    txHash: '0x' + crypto.randomBytes(32).toString('hex'),
-    blockNumber: Math.floor(Math.random() * 1000000) + 5000000
-  });
-});
 
 // ==================== INFLUENCER ENDPOINTS ====================
 
