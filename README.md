@@ -151,6 +151,31 @@ Deploy to Render.com, Railway.app, or similar.
 
 ---
 
+## 📱 Deployment
+
+### Frontend → Vercel
+1. Go to https://vercel.com
+2. Import `ibrahimq21/psl-fanchain`
+3. Select `frontend` folder
+4. Add env vars:
+   ```
+   REACT_APP_API_URL = https://your-backend.onrender.com
+   REACT_APP_WIREFLUID_RPC = https://evm.wirefluid.com
+   REACT_APP_CONTRACT_ADDRESS = 0x7Ddb788669d63F20abeCBF55C74604a074681523
+   REACT_APP_CHAIN_ID = 92533
+   ```
+
+### Backend → Render/Railway
+See [backend/DEPLOY.md](backend/DEPLOY.md) for full instructions.
+
+Quick start:
+1. Deploy to https://render.com
+2. Add MySQL database
+3. Set environment variables
+4. Connect to GitHub
+
+---
+
 ## 📝 License
 
 MIT
