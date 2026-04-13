@@ -1,12 +1,5 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "build",
-  "installCommand": "npm install",
-  "framework": "react",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://psl-fanchain.onrender.com/$1"
-    }
-  ]
+  "installCommand": "npm install"
 }
