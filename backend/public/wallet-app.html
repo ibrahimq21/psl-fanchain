@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSL FanChain - Connect Wallet</title>
+  <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding-bottom: 70px; }
+    .header { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 15px; text-align: center; }
+    .header h1 { font-size: 18px; }
+    .header .wallet { font-size: 12px; opacity: 0.9; }
+    
+    .card { background: white; margin: 10px; padding: 15px; border-radius: 12px; }
+    .card h2 { font-size: 14px; color: #666; margin-bottom: 12px; }
+    
+    .connect-btn {
+      width: 100%; padding: 16px; background: linear-gradient(135deg, #7c3aed, #a855f7);
+      color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold;
+      cursor: pointer; margin: 10px 0;
+    }
+    .connect-btn:disabled { background: #ccc; cursor: not-allowed; }
+    
+    .wallet-display {
+      background: #f8fafc; padding: 15px; border-radius: 10px; text-align: center;
+    }
+    .wallet-display .address { font-family: monospace; font-size: 16px; color: #333; }
+    .wallet-display .balance { font-size: 14px; color: #888; margin-top: 5px; }
+    
+    .campaign-item {
+      padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .campaign-item:hover { border-color: #7c3aed; }
+    .campaign-item.active { border-color: #7c3aed; background: #f5f3ff; }
+    .campaign-item h3 { font-size: 14px; color: #333; }
+    .campaign-item p { font-size: 12px; color: #888; }
+    .campaign-item .reward { 
+      display: inline-block; background: #22c55e; color: white; 
+      padding: 4px 8px; border-radius: 12px; font-size: 11px; margin-top: 5px; 
+    }
+    
+    .checkin-btn {
+      width: calc(100% - 20px); margin: 15px 10px; padding: 16px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .status { padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
+    .status.success { background: #dcfce7; color: #166534; }
+    .status.error { background: #fee2e2; color: #991b1b; }
+    .status.info { background: #dbeafe; color: #1e40af; }
+    
+    .nav-tabs { display: flex; background: white; border-bottom: 1px solid #e0e0e0; }
+    .nav-tab { flex: 1; padding: 12px; text-align: center; font-size: 12px; color: #666; cursor: pointer; border-bottom: 2px solid transparent; }
+    .nav-tab.active { color: #7c3aed; border-bottom-color: #7c3aed; }
+    
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid #e0e0e0; }
+    .nav-btn { flex: 1; padding: 12px; text-align: center; background: none; border: none; font-size: 11px; color: #757575; cursor: pointer; }
+    .nav-btn.active { color: #7c3aed; }
+    
+    .nft-card {
+      background: white; border-radius: 12px; overflow: hidden; margin-bottom: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .nft-card-header { background: linear-gradient(135deg, #7c3aed, #a855f7); padding: 15px; color: white; }
+    .nft-card-body { padding: 15px; }
+    .nft-card h3 { font-size: 16px; }
+    .nft-card p { font-size: 12px; color: #666; }
+    
+    .share-btn {
+      width: 100%; padding: 12px; background: #22c55e; color: white;
+      border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🏏 PSL FanChain</h1>
+    <div class="wallet" id="walletDisplay">Not Connected</div>
+  </div>
+
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="switchTab('campaigns')">Campaigns</div>
+    <div class="nav-tab" onclick="switchTab('wallet')">Wallet</div>
+    <div class="nav-tab" onclick="switchTab('nfts')">My NFTs</div>
+  </div>
+
+  <!-- CAMPAIGNS TAB -->
+  <div id="campaigns" class="tab-content active">
+    <div class="card">
+      <h2>Active Campaigns</h2>
+      <div id="campaignList">
+        <p style="color:#888; text-align:center;">Loading campaigns...</p>
+      </div>
+    </div>
+    
+    <div class="card" id="checkinSection" style="display:none;">
+      <h2>Check In</h2>
+      <div id="checkinStatus"></div>
+      <button class="checkin-btn" onclick="doCheckIn()">📍 Check In Now</button>
+    </div>
+  </div>
+
+  <!-- WALLET TAB -->
+  <div id="wallet" class="tab-content">
+    <div class="card">
+      <h2>Connect Wallet</h2>
+      <button class="connect-btn" id="connectBtn" onclick="connectWallet()">
+        🔗 Connect MetaMask
+      </button>
+    </div>
+    
+    <div class="card">
+      <h2>Wallet Info</h2>
+      <div class="wallet-display" id="walletInfo" style="display:none;">
+        <div class="address" id="walletAddress">-</div>
+        <div class="balance" id="walletBalance">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NFTS TAB -->
+  <div id="nfts" class="tab-content">
+    <div class="card">
+      <h2>My NFTs</h2>
+      <div id="nftList">
+        <p style="color:#888; text-align:center;">No NFTs yet</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn" onclick="window.location.href='/webapp.html'">🏠 App</button>
+    <button class="nav-btn" onclick="window.location.href='/influencer.html'">🎯 Influencer</button>
+    <button class="nav-btn" onclick="window.location.href='/admin.html'">⚙️ Admin</button>
+  </div>
+
+  <script>
+    // ===== WALLET CONNECTION =====
+    let provider, signer, walletAddress;
+    const API_URL = 'http://localhost:3004/api';
+    let selectedCampaign = null;
+    let userLat = 33.6517, userLng = 73.0785; // Default rawalpindi
+    
+    // Connect wallet
+    async function connectWallet() {
+      const btn = document.getElementById('connectBtn');
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      
+      try {
+        if (typeof window.ethereum !== 'undefined') {
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+          await provider.send("eth_requestAccounts", []);
+          signer = provider.getSigner();
+          walletAddress = await signer.getAddress();
+          
+          // Update UI
+          document.getElementById('walletDisplay').textContent = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
+          document.getElementById('walletAddress').textContent = walletAddress;
+          document.getElementById('walletInfo').style.display = 'block';
+          document.getElementById('connectBtn').style.display = 'none';
+          
+          // Get balance
+          const balance = await provider.getBalance(walletAddress);
+          document.getElementById('walletBalance').textContent = ethers.utils.formatEther(balance).slice(0, 6) + ' ETH';
+          
+          // Load NFTs after connecting
+          loadUserNFTs();
+        } else {
+          alert('MetaMask not installed!');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Connection failed: ' + err.message);
+      }
+      btn.disabled = false;
+      btn.textContent = '🔗 Connect MetaMask';
+    }
+    
+    // ===== CAMPAIGNS =====
+    async function loadCampaigns() {
+      try {
+        const res = await fetch(API_URL + '/campaigns');
+        const data = await res.json();
+        
+        const list = document.getElementById('campaignList');
+        if (data.campaigns && data.campaigns.length > 0) {
+          list.innerHTML = data.campaigns.map(c => `
+            <div class="campaign-item" onclick="selectCampaign('${c.id}')" id="camp_${c.id}">
+              <h3>${c.name}</h3>
+              <p>${c.description}</p>
+              <p>📍 ${c.stadiumId} • ${new Date(c.startTime).toLocaleDateString()}</p>
+              <span class="reward">+${c.rewardPoints} points</span>
+            </div>
+          `).join('');
+        } else {
+          list.innerHTML = '<p style="color:#888; text-align:center;">No active campaigns</p>';
+        }
+      } catch (err) {
+        document.getElementById('campaignList').innerHTML = '<p style="color:#888;">API offline - using demo data</p>';
+        // Fallback demo campaigns
+        renderDemoCampaigns();
+      }
+    }
+    
+    function renderDemoCampaigns() {
+      const demo = [
+        { id: 'demo1', name: 'Match Day NFT Drop', description: 'Join me at Rawalpindi Stadium!', stadiumId: 'rawalpindi', rewardPoints: 500 },
+        { id: 'demo2', name: 'Lahore Derby', description: 'Catch the thrill live!', stadiumId: 'lahore', rewardPoints: 300 },
+        { id: 'demo3', name: 'Karachi Night', description: 'PSL finals night', stadiumId: 'karachi', rewardPoints: 1000 }
+      ];
+      
+      document.getElementById('campaignList').innerHTML = demo.map(c => `
+        <div class="campaign-item" onclick="selectCampaign('${c.id}')" id="camp_${c.id}">
+          <h3>${c.name}</h3>
+          <p>${c.description}</p>
+          <p>📍 ${c.stadiumId}</p>
+          <span class="reward">+${c.rewardPoints} points</span>
+        </div>
+      `).join('');
+    }
+    
+    function selectCampaign(campaignId) {
+      selectedCampaign = campaignId;
+      
+      // Update UI
+      document.querySelectorAll('.campaign-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('camp_' + campaignId).classList.add('active');
+      
+      // Show check-in section
+      document.getElementById('checkinSection').style.display = 'block';
+      document.getElementById('checkinStatus').innerHTML = '<div class="status info">Campaign selected! Ready to check in.</div>';
+    }
+    
+    // ===== CHECK-IN =====
+    async function doCheckIn() {
+      if (!walletAddress) {
+        alert('Please connect wallet first!');
+        return;
+      }
+      
+      if (!selectedCampaign) {
+        alert('Please select a campaign first!');
+        return;
+      }
+      
+      const statusEl = document.getElementById('checkinStatus');
+      statusEl.innerHTML = '<div class="status info">Validating location...</div>';
+      
+      try {
+        // Get user location
+        if (navigator.geolocation) {
+          const pos = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+          });
+          userLat = pos.coords.latitude;
+          userLng = pos.coords.longitude;
+        }
+        
+        // Validate location (mock validation for demo)
+        statusEl.innerHTML = '<div class="status info">Checking anti-spoof...</div>';
+        
+        const validateRes = await fetch(API_URL + '/validate-location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lat: userLat,
+            lng: userLng,
+            accuracy: 15,
+            deviceInfo: { emulator: false, rooted: false, selfieVerified: true },
+            stadiumId: 'rawalpindi'
+          })
+        });
+        
+        const validation = await validateRes.json();
+        
+        if (validation.valid) {
+          statusEl.innerHTML = '<div class="status success">✅ Location verified! Minting NFT...</div>';
+          
+          // In real app, call /checkin API
+          // For demo, show success
+          setTimeout(() => {
+            statusEl.innerHTML = '<div class="status success">✅ Check-in Successful!\n\n NFT minted to your wallet!\n+500 Points</div>';
+            addDemoNFT();
+          }, 1500);
+        } else {
+          statusEl.innerHTML = '<div class="status error">❌ Validation failed: ' + (validation.reasons || []).join(', ') + '</div>';
+        }
+      } catch (err) {
+        // Demo mode - allow anyway
+        statusEl.innerHTML = '<div class="status success">✅ Demo Check-in Successful!\n\n NFT minted!\n+500 Points</div>';
+        addDemoNFT();
+      }
+    }
+    
+    // ===== NFTS =====
+    async function loadUserNFTs() {
+      if (!walletAddress) return;
+      
+      try {
+        const res = await fetch(API_URL + '/users/' + walletAddress + '/nfts');
+        const data = await res.json();
+        
+        renderNFTs(data.nfts || []);
+      } catch (err) {
+        console.log('Using demo NFTs');
+      }
+    }
+    
+    function addDemoNFT() {
+      const demoNFTs = JSON.parse(localStorage.getItem('fanChainNFTs') || '[]');
+      demoNFTs.push({
+        id: 'nft_' + Date.now(),
+        campaign: selectedCampaign || 'demo1',
+        timestamp: Date.now()
+      });
+      localStorage.setItem('fanChainNFTs', JSON.stringify(demoNFTs));
+      renderNFTs(demoNFTs);
+    }
+    
+    function renderNFTs(nfts) {
+      const list = document.getElementById('nftList');
+      if (nfts.length > 0) {
+        list.innerHTML = nfts.map(nft => `
+          <div class="nft-card">
+            <div class="nft-card-header">
+              <h3>🎫 PSL Fan NFT</h3>
+            </div>
+            <div class="nft-card-body">
+              <p>Campaign: ${nft.campaign}</p>
+              <p>Token ID: ${nft.id}</p>
+              <p>Minted: ${new Date(nft.timestamp).toLocaleString()}</p>
+              <button class="share-btn" onclick="shareNFT('${nft.id}')">📤 Share</button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        list.innerHTML = '<p style="color:#888; text-align:center;">No NFTs yet. Check in to earn one!</p>';
+      }
+    }
+    
+    function shareNFT(nftId) {
+      const text = `I just got my #PSLFanNFT! 🏏\n\nJoin me at PSL matches and earn exclusive NFTs!\n\n#PSL #FanChain #Cricket`;
+      alert('Share text copied!\n\n' + text);
+    }
+    
+    // ===== TABS =====
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(tab).classList.add('active');
+      event.target.classList.add('active');
+    }
+    
+    // Initialize
+    window.onload = function() {
+      loadCampaigns();
+      renderNFTs(JSON.parse(localStorage.getItem('fanChainNFTs') || '[]'));
+    };
+  </script>
+</body>
+</html>

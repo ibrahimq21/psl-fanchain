@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSL Sponsors - Brand Dashboard</title>
+  <meta name="theme-color" content="#6366f1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); min-height: 100vh; }
+    
+    .header {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .header h1 { font-size: 20px; }
+    .header .brand { font-size: 14px; opacity: 0.9; }
+    
+    .card {
+      background: white; margin: 15px; padding: 15px; border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .card h2 { font-size: 14px; color: #666; margin-bottom: 12px; text-transform: uppercase; }
+    
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      text-align: center;
+    }
+    .stat { padding: 15px 10px; background: #f8fafc; border-radius: 8px; }
+    .stat-value { font-size: 24px; font-weight: bold; color: var(--primary); }
+    .stat-label { font-size: 11px; color: #888; }
+    
+    .offer-item {
+      padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px; margin-bottom: 10px;
+    }
+    .offer-item.active { border-color: var(--success); background: #f0fdf4; }
+    .offer-status {
+      display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px;
+    }
+    .offer-status.active { background: #dcfce7; color: #166534; }
+    .offer-status.paused { background: #fef3c7; color: #92400e; }
+    
+    .offer-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    }
+    .offer-card {
+      background: white; border: 2px solid #e5e7eb; border-radius: 10px;
+      padding: 12px; cursor: pointer; transition: all 0.2s;
+    }
+    .offer-card:hover { border-color: var(--primary); }
+    .offer-card.selected { border-color: var(--primary); background: #eef2ff; }
+    .offer-card h3 { font-size: 14px; color: #333; margin-bottom: 5px; }
+    .offer-card p { font-size: 12px; color: #888; }
+    .offer-card .coupon { 
+      background: #f59e0b; color: white; padding: 4px 8px; 
+      border-radius: 4px; font-size: 12px; font-weight: bold;
+    }
+    
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; color: #666; margin-bottom: 5px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px;
+      font-size: 14px;
+    }
+    .form-group textarea { min-height: 80px; resize: vertical; }
+    
+    .btn {
+      width: 100%; padding: 12px; background: var(--primary); color: white;
+      border: none; border-radius: 8px; font-size: 14px; font-weight: bold;
+      cursor: pointer;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn.secondary { background: #e5e7eb; color: #333; }
+    .btn.danger { background: var(--danger); }
+    
+    .tabs {
+      display: flex; background: white; border-bottom: 1px solid #e5e7eb;
+    }
+    .tab {
+      flex: 1; padding: 12px; text-align: center; font-size: 13px; color: #666;
+      cursor: pointer;
+    }
+    .tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+    
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    
+    .analytics-bar {
+      height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;
+    }
+    .analytics-fill {
+      height: 100%; background: linear-gradient(90deg, var(--primary), #8b5cf6);
+      border-radius: 4px; transition: width 0.5s;
+    }
+    
+    .qr-display {
+      background: white; padding: 20px; text-align: center; border-radius: 12px;
+      border: 2px dashed #e5e7eb;
+    }
+    .qr-code {
+      width: 150px; height: 150px; background: #eee; margin: 10px auto;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: #888;
+    }
+    
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: white; display: flex; border-top: 1px solid #e5e7eb;
+    }
+    .nav-btn {
+      flex: 1; padding: 12px; text-align: center; background: none; border: none;
+      font-size: 12px; color: #666; cursor: pointer;
+    }
+    .nav-btn.active { color: var(--primary); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>🏏 PSL Sponsors</h1>
+      <div class="brand">Brand Ambassador Dashboard</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:20px;">🏆</div>
+    </div>
+  </div>
+
+  <!-- Dashboard Tab -->
+  <div id="dashboardTab" class="tab-content active">
+    <div class="card">
+      <h2>Overview</h2>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="totalOffers">5</div>
+          <div class="stat-label">Total Offers</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="totalClaims">247</div>
+          <div class="stat-label">Claims</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">89</div>
+          <div class="stat-label">Ambassadors</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Top Offers</h2>
+      <div class="offer-item active">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 style="font-size:14px;">🍔 Free Burger - Gaddafi Grill</h3>
+            <p style="font-size:12px; color:#888;">Valid at all matches this season</p>
+          </div>
+          <span class="offer-status active">ACTIVE</span>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:15px; font-size:12px; color:#666;">
+          <span>🔥 89 claims</span>
+          <span>⭐ 4.8 rating</span>
+        </div>
+      </div>
+      <div class="offer-item">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 style="font-size:14px;">🎫 50% Off Tickets</h3>
+            <p style="font-size:12px; color:#888;">PSL Final 2026</p>
+          </div>
+          <span class="offer-status paused">PAUSED</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Offer Tab -->
+  <div id="createTab" class="tab-content">
+    <div class="card">
+      <h2>Create New Offer</h2>
+      <div class="form-group">
+        <label>Brand Name</label>
+        <input type="text" id="brandName" placeholder="e.g., Gaddafi Grill">
+      </div>
+      <div class="form-group">
+        <label>Offer Title</label>
+        <input type="text" id="offerTitle" placeholder="e.g., Free Burger with Match Ticket">
+      </div>
+      <div class="form-group">
+        <label>Offer Description</label>
+        <textarea id="offerDesc" placeholder="Describe the offer..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Discount</label>
+        <input type="text" id="offerDiscount" placeholder="e.g., 50% OFF, Free, Buy 1 Get 1">
+      </div>
+      <div class="form-group">
+        <label>Stadium</label>
+        <select id="stadiumSelect">
+          <option value="all">All Stadiums</option>
+          <option value="lahore">Gaddafi Stadium</option>
+          <option value="karachi">National Karachi</option>
+          <option value="rawalpindi">Rawalpindi</option>
+          <option value="peshawar">Arbab Niaz</option>
+          <option value="quetta">Bugti Stadium</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Valid Until</label>
+        <input type="date" id="validUntil">
+      </div>
+      <div class="form-group">
+        <label>Total Coupons Available</label>
+        <input type="number" id="totalCoupons" placeholder="e.g., 500">
+      </div>
+      <button class="btn" onclick="createOffer()">🚀 Create Offer</button>
+    </div>
+  </div>
+
+  <!-- Offers Tab -->
+  <div id="offersTab" class="tab-content">
+    <div class="card">
+      <h2>Your Offers</h2>
+      <div class="offer-grid" id="offersList">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- QR Tab -->
+  <div id="qrTab" class="tab-content">
+    <div class="card">
+      <h2>Generate Offer QR</h2>
+      <div class="form-group">
+        <label>Select Offer</label>
+        <select id="qrOfferSelect" onchange="generateQR()">
+          <option value="">Choose offer...</option>
+        </select>
+      </div>
+      <div class="qr-display" id="qrDisplay">
+        <div class="qr-code" id="qrCode">Select an offer</div>
+        <p id="qrOffer" style="font-size:14px; font-weight:bold;"></p>
+        <p id="qrCodeText" style="font-size:12px; color:#666; margin-top:5px;"></p>
+      </div>
+      <button class="btn" style="margin-top:15px;" onclick="downloadQR()">⬇️ Download QR</button>
+    </div>
+    <div class="card">
+      <h2>Share Campaign</h2>
+      <p style="font-size:13px; color:#666; margin-bottom:10px;">Share link with ambassadors:</p>
+      <div style="background:#f8fafc; padding:10px; border-radius:8px; font-family:monospace; font-size:12px; word-break:break-all;">
+        https://psl-fan.com/join?brand=gaddafi-grill
+      </div>
+      <button class="btn secondary" style="margin-top:10px;">📋 Copy Link</button>
+    </div>
+  </div>
+
+  <!-- Analytics Tab -->
+  <div id="analyticsTab" class="tab-content">
+    <div class="card">
+      <h2>Performance</h2>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">2.4K</div>
+          <div class="stat-label">Total Reach</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">12%</div>
+          <div class="stat-label">Conversion</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">4.9</div>
+          <div class="stat-label">Avg Rating</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Claims by Stadium</h2>
+      <div style="margin-top:10px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
+          <span>Gaddafi Stadium</span><span>145</span>
+        </div>
+        <div class="analytics-bar"><div class="analytics-fill" style="width:65%;"></div></div>
+      </div>
+      <div style="margin-top:15px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
+          <span>National Karachi</span><span>52</span>
+        </div>
+        <div class="analytics-bar"><div class="analytics-fill" style="width:25%;"></div></div>
+      </div>
+      <div style="margin-top:15px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
+          <span>Others</span><span>25</span>
+        </div>
+        <div class="analytics-bar"><div class="analytics-fill" style="width:10%;"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="nav-btn" onclick="switchTab('create')">➕ Create</button>
+    <button class="nav-btn" onclick="switchTab('offers')">🎁 Offers</button>
+    <button class="nav-btn" onclick="switchTab('qr')">📷 QR Code</button>
+    <button class="nav-btn" onclick="switchTab('analytics')">📈 Analytics</button>
+  </div>
+
+  <script>
+    // State
+    let offers = [
+      { id: 1, brand: 'Gaddafi Grill', title: 'Free Burger', desc: 'Free burger with any match ticket', discount: 'FREE', stadium: 'lahore', status: 'active', claims: 89, total: 200 },
+      { id: 2, brand: 'Coca Cola', title: '50% Off Drinks', desc: 'On all beverages', discount: '50%', stadium: 'all', status: 'active', claims: 156, total: 500 },
+      { id: 3, brand: 'Nike', title: ' jersey Discount', desc: 'PSL team jerseys', discount: '30%', stadium: 'all', status: 'paused', claims: 45, total: 100 },
+      { id: 4, brand: 'Careem', title: 'Free Ride', desc: 'Free ride to stadium', discount: 'FREE', stadium: 'all', status: 'active', claims: 78, total: 300 },
+      { id: 5, brand: 'Jazz', title: 'Data Bundle', desc: '1GB free data', discount: 'FREE', stadium: 'all', status: 'active', claims: 34, total: 1000 }
+    ];
+
+    // Render offers
+    function renderOffers() {
+      const list = document.getElementById('offersList');
+      list.innerHTML = offers.map(o => `
+        <div class="offer-card" onclick="selectOffer(${o.id})">
+          <h3>${o.title}</h3>
+          <p>${o.brand}</p>
+          <div class="coupon">${o.discount}</div>
+          <p style="font-size:11px; margin-top:5px;">${o.claims}/${o.total} claimed</p>
+        </div>
+      `).join('');
+      
+      // Update QR select
+      const qrSel = document.getElementById('qrOfferSelect');
+      qrSel.innerHTML = '<option value="">Choose offer...</option>' + 
+        offers.map(o => `<option value="${o.id}">${o.title} - ${o.brand}</option>`).join('');
+    }
+
+    // Tab switching
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tab + 'Tab').classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // Create offer
+    function createOffer() {
+      const brand = document.getElementById('brandName').value;
+      const title = document.getElementById('offerTitle').value;
+      const desc = document.getElementById('offerDesc').value;
+      const discount = document.getElementById('offerDiscount').value;
+      const stadium = document.getElementById('stadiumSelect').value;
+      const total = parseInt(document.getElementById('totalCoupons').value);
+      
+      if (!brand || !title || !discount) {
+        alert('Please fill all required fields');
+        return;
+      }
+      
+      const newOffer = {
+        id: offers.length + 1,
+        brand,
+        title,
+        desc,
+        discount,
+        stadium,
+        status: 'active',
+        claims: 0,
+        total: total || 100
+      };
+      
+      offers.push(newOffer);
+      document.getElementById('totalOffers').textContent = offers.length;
+      
+      // Clear form
+      document.getElementById('brandName').value = '';
+      document.getElementById('offerTitle').value = '';
+      document.getElementById('offerDesc').value = '';
+      document.getElementById('offerDiscount').value = '';
+      
+      renderOffers();
+      alert('✅ Offer created successfully!\n\nShare QR code from QR tab.');
+    }
+
+    // Generate QR
+    function generateQR() {
+      const id = document.getElementById('qrOfferSelect').value;
+      if (!id) return;
+      
+      const offer = offers.find(o => o.id == id);
+      if (offer) {
+        const code = `PSL-${offer.id}-${Date.now()}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(code)}`;
+        
+        document.getElementById('qrCode').innerHTML = `<img src="${qrUrl}" alt="QR Code" style="width:150px;height:150px;">`;
+        document.getElementById('qrOffer').textContent = offer.title;
+        document.getElementById('qrCodeText').textContent = code;
+        document.getElementById('qrCodeText').dataset.url = qrUrl;
+      }
+    }
+
+    function downloadQR() {
+      const img = document.querySelector('#qrCode img');
+      if (!img) {
+        alert('Please generate a QR code first');
+        return;
+      }
+      
+      // Download the image
+      const link = document.createElement('a');
+      link.href = img.src;
+      link.download = 'psl-offer-qr.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Init
+    window.onload = renderOffers;
+  </script>
+</body>
+</html>

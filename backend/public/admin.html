@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSL FanChain - Admin Dashboard</title>
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #1a1a2e;
+      --secondary: #16213e;
+      --accent: #e94560;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg: #0f0f1a;
+      --text: #eee;
+      --text-dim: #888;
+    }
+    body { 
+      font-family: 'Segoe UI', system-ui, sans-serif; 
+      background: var(--bg); color: var(--text);
+      min-height: 100vh;
+    }
+    
+    .header {
+      background: var(--primary); padding: 15px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; z-index: 100;
+      border-bottom: 1px solid #333;
+    }
+    .header h1 { font-size: 18px; }
+    .header .logo { color: var(--accent); }
+    
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 15px;
+    }
+    .stat-card {
+      background: var(--secondary); padding: 15px; border-radius: 10px;
+      text-align: center;
+    }
+    .stat-card .value { font-size: 28px; font-weight: bold; color: var(--accent); }
+    .stat-card .label { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
+    
+    .card {
+      background: var(--secondary); margin: 0 15px 15px; padding: 15px; border-radius: 10px;
+    }
+    .card h2 { font-size: 14px; color: var(--text-dim); margin-bottom: 12px; text-transform: uppercase; }
+    
+    .table {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px;
+    }
+    .table th { text-align: left; padding: 10px; background: var(--primary); color: var(--text-dim); }
+    .table td { padding: 10px; border-bottom: 1px solid #333; }
+    .table tr:hover { background: rgba(255,255,255,0.02); }
+    
+    .badge {
+      display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px;
+    }
+    .badge.success { background: rgba(34,197,94,0.2); color: var(--success); }
+    .badge.warning { background: rgba(245,158,11,0.2); color: var(--warning); }
+    .badge.danger { background: rgba(239,68,68,0.2); color: var(--danger); }
+    
+    .btn {
+      padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 12px;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    
+    .tabs {
+      display: flex; background: var(--primary);
+    }
+    .tab {
+      flex: 1; padding: 12px; text-align: center; font-size: 13px; color: var(--text-dim);
+      cursor: pointer; border-bottom: 2px solid transparent;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .form-group { flex: 1; }
+    .form-group label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px; background: var(--primary); border: 1px solid #333;
+      color: var(--text); border-radius: 6px;
+    }
+    
+    #map { height: 300px; border-radius: 8px; }
+    
+    .log-entry {
+      padding: 8px 0; border-bottom: 1px solid #333; font-size: 12px;
+    }
+    .log-entry .time { color: var(--text-dim); }
+    .log-entry .action { color: var(--warning); }
+    
+    .search-bar {
+      padding: 10px 15px; background: var(--primary);
+      position: sticky; top: 55px; z-index: 50;
+    }
+    .search-bar input {
+      width: 100%; padding: 10px; background: var(--secondary);
+      border: 1px solid #333; color: var(--text); border-radius: 6px;
+    }
+    
+    .modal {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal.show { display: flex; }
+    .modal-content {
+      background: var(--secondary); padding: 20px; border-radius: 12px;
+      max-width: 500px; width: 90%;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; margin-bottom: 15px;
+    }
+    .modal-close { cursor: pointer; font-size: 20px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><span class="logo">🏏</span> PSL FanChain <span style="color:var(--text-dim);font-size:14px;">Admin</span></h1>
+    <div style="font-size:12px; color:var(--text-dim);">
+      <span id="adminTime"></span>
+    </div>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" placeholder="🔍 Search users, check-ins, brands..." onkeyup="searchAll(this.value)">
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="value" id="totalUsers">1,247</div>
+      <div class="label">Total Users</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="totalCheckins">5,832</div>
+      <div class="label">Check-ins</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="totalOffers">23</div>
+      <div class="label">Active Offers</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="totalRevenue">$12.4K</div>
+      <div class="label">Revenue</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('users')">👥 Users</div>
+    <div class="tab" onclick="switchTab('checkins')">📍 Check-ins</div>
+    <div class="tab" onclick="switchTab('stadiums')">🏟️ Stadiums</div>
+    <div class="tab" onclick="switchTab('brands')">🏷️ Brands</div>
+    <div class="tab" onclick="switchTab('offers')">🎁 Offers</div>
+    <div class="tab" onclick="switchTab('map')">🗺️ Map</div>
+    <div class="tab" onclick="switchTab('logs')">📋 Logs</div>
+  </div>
+
+  <!-- Users Tab -->
+  <div id="usersTab" class="tab-content active">
+    <div class="card">
+      <h2>User Management</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Wallet</th>
+            <th>Check-ins</th>
+            <th>Points</th>
+            <th>NFTs</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="usersList">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Check-ins Tab -->
+  <div id="checkinsTab" class="tab-content">
+    <div class="card">
+      <h2>Recent Check-ins</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>User</th>
+            <th>Stadium</th>
+            <th>Distance</th>
+            <th>Risk Score</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="checkinsList">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Stadiums Tab -->
+  <div id="stadiumsTab" class="tab-content">
+    <div class="card">
+      <h2>Stadium Management</h2>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+        <div class="stat-card">
+          <div class="value" style="font-size:18px;">Gaddafi</div>
+          <div class="label">1,247 check-ins</div>
+        </div>
+        <div class="stat-card">
+          <div class="value" style="font-size:18px;">Karachi</div>
+          <div class="label">892 check-ins</div>
+        </div>
+        <div class="stat-card">
+          <div class="value" style="font-size:18px;">Rawalpindi</div>
+          <div class="label">634 check-ins</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Brands Tab -->
+  <div id="brandsTab" class="tab-content">
+    <div class="card">
+      <h2>Brand Partners</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Brand</th>
+            <th>Offers</th>
+            <th>Claims</th>
+            <th>Revenue</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="brandsList">
+          <tr>
+            <td>Gaddafi Grill</td>
+            <td>5</td>
+            <td>892</td>
+            <td>$4,200</td>
+            <td><span class="badge success">Active</span></td>
+          </tr>
+          <tr>
+            <td>Coca Cola</td>
+            <td>3</td>
+            <td>1,247</td>
+            <td>$2,100</td>
+            <td><span class="badge success">Active</span></td>
+          </tr>
+          <tr>
+            <td>Careem</td>
+            <td>2</td>
+            <td>567</td>
+            <td>$1,800</td>
+            <td><span class="badge warning">Pending</span></td>
+          </tr>
+          <tr>
+            <td>Nike</td>
+            <td>1</td>
+            <td>0</td>
+            <td>$0</td>
+            <td><span class="badge danger">Expired</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Offers Tab -->
+  <div id="offersTab" class="tab-content">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>All Offers</h2>
+        <button class="btn btn-primary" onclick="openModal('createOffer')">+ Create</button>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Offer</th>
+            <th>Brand</th>
+            <th>Claims</th>
+            <th>Limit</th>
+            <th>Exp</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="offersList">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Map Tab -->
+  <div id="mapTab" class="tab-content">
+    <div class="card">
+      <h2>Live Check-in Map</h2>
+      <div id="adminMap"></div>
+    </div>
+  </div>
+
+  <!-- Logs Tab -->
+  <div id="logsTab" class="tab-content">
+    <div class="card">
+      <h2>System Logs</h2>
+      <div id="logsList">
+        <div class="log-entry"><span class="time">15:23:01</span> <span class="action">User 0x7a3f... verified check-in at Gaddafi Stadium</span></div>
+        <div class="log-entry"><span class="time">15:22:45</span> <span class="action">Brand Nike created offer: 30% Off Jersey</span></div>
+        <div class="log-entry"><span class="time">15:21:30</span> <span class="action">Blocked mock location attempt by user 0x8b2c...</span></div>
+        <div class="log-entry"><span class="time">15:20:15</span> <span class="action">New user registered: 0x9d4e...</span></div>
+        <div class="log-entry"><span class="time">15:19:02</span> <span class="action">Claimed: Free Burger - Gaddafi Grill</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Offer Modal -->
+  <div id="createOfferModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Create New Offer</h2>
+        <span class="modal-close" onclick="closeModal('createOffer')">&times;</span>
+      </div>
+      <div class="form-group">
+        <label>Brand</label>
+        <select id="newOfferBrand">
+          <option value="">Select brand...</option>
+          <option value="gaddafi-grill">Gaddafi Grill</option>
+          <option value="coca-cola">Coca Cola</option>
+          <option value="careem">Careem</option>
+          <option value="nike">Nike</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Offer Title</label>
+        <input type="text" id="newOfferTitle" placeholder="e.g., Free Burger">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Discount</label>
+          <input type="text" id="newOfferDiscount" placeholder="e.g., 50% OFF">
+        </div>
+        <div class="form-group">
+          <label>Limit</label>
+          <input type="number" id="newOfferLimit" placeholder="100">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Valid Until</label>
+        <input type="date" id="newOfferExpiry">
+      </div>
+      <button class="btn btn-primary" style="width:100%;" onclick="createNewOffer()">Create Offer</button>
+    </div>
+  </div>
+
+  <script>
+    // Data
+    const users = [
+      { id: 1, wallet: '0x7a3f...9f', checkins: 12, points: 145, nfts: 2, status: 'active' },
+      { id: 2, wallet: '0x8b2c...4d', checkins: 8, points: 89, nfts: 1, status: 'active' },
+      { id: 3, wallet: '0x9d4e...2a', checkins: 3, points: 34, nfts: 0, status: 'active' },
+      { id: 4, wallet: '0x2f1a...7b', checkins: 15, points: 178, nfts: 3, status: 'suspended' },
+      { id: 5, wallet: '0x5c3d...8f', checkins: 1, points: 12, nfts: 0, status: 'active' }
+    ];
+
+    const checkins = [
+      { time: '15:23:01', user: '0x7a3f', stadium: 'Gaddafi', distance: '45m', risk: '12', status: 'verified' },
+      { time: '15:22:33', user: '0x8b2c', stadium: 'Karachi', distance: '120m', risk: '25', status: 'verified' },
+      { time: '15:21:45', user: '0x9d4e', stadium: 'Rawalpindi', distance: '0m', risk: '89', status: 'blocked' },
+      { time: '15:20:12', user: '0x2f1a', stadium: 'Gaddafi', distance: '89m', risk: '18', status: 'verified' },
+      { time: '15:19:30', user: '0x5c3d', stadium: 'Peshawar', distance: '234m', risk: '45', status: 'flagged' }
+    ];
+
+    const offers = [
+      { title: 'Free Burger', brand: 'Gaddafi Grill', claims: 89, limit: 200, exp: '2026-04-30', status: 'active' },
+      { title: '50% Off', brand: 'Coca Cola', claims: 156, limit: 500, exp: '2026-05-15', status: 'active' },
+      { title: 'Free Ride', brand: 'Careem', claims: 67, limit: 300, exp: '2026-04-20', status: 'active' },
+      { title: '30% Off', brand: 'Nike', claims: 0, limit: 100, exp: '2026-04-01', status: 'expired' }
+    ];
+
+    // Init
+    function init() {
+      renderUsers();
+      renderCheckins();
+      renderOffers();
+      initMap();
+      updateTime();
+      setInterval(updateTime, 1000);
+    }
+
+    function updateTime() {
+      document.getElementById('adminTime').textContent = new Date().toLocaleTimeString();
+    }
+
+    function renderUsers() {
+      document.getElementById('usersList').innerHTML = users.map(u => `
+        <tr>
+          <td>#${u.id}</td>
+          <td style="font-family:monospace;">${u.wallet}</td>
+          <td>${u.checkins}</td>
+          <td>${u.points}</td>
+          <td>${u.nfts}</td>
+          <td><span class="badge ${u.status === 'active' ? 'success' : 'danger'}">${u.status}</span></td>
+          <td>
+            <button class="btn btn-danger" onclick="suspendUser(${u.id})">${u.status === 'active' ? 'Suspend' : 'Activate'}</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderCheckins() {
+      document.getElementById('checkinsList').innerHTML = checkins.map(c => `
+        <tr>
+          <td>${c.time}</td>
+          <td style="font-family:monospace;">${c.user}</td>
+          <td>${c.stadium}</td>
+          <td>${c.distance}</td>
+          <td>${c.risk}</td>
+          <td><span class="badge ${c.status === 'verified' ? 'success' : c.status === 'blocked' ? 'danger' : 'warning'}">${c.status}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    function renderOffers() {
+      document.getElementById('offersList').innerHTML = offers.map(o => `
+        <tr>
+          <td>${o.title}</td>
+          <td>${o.brand}</td>
+          <td>${o.claims}</td>
+          <td>${o.limit}</td>
+          <td>${o.exp}</td>
+          <td><span class="badge ${o.status === 'active' ? 'success' : 'danger'}">${o.status}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    function initMap() {
+      const map = L.map('adminMap').setView([30.0, 69.0], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OSM'
+      }).addTo(map);
+
+      // Stadium markers
+      const stadiums = [
+        { name: 'Gaddafi', lat: 31.5080, lng: 74.3333 },
+        { name: 'Karachi', lat: 24.8910, lng: 67.0755 },
+        { name: 'Rawalpindi', lat: 33.6517, lng: 73.0785 }
+      ];
+      
+      stadiums.forEach(s => {
+        L.marker([s.lat, s.lng]).addTo(map).bindPopup(`<b>${s.name}</b><br>Click for stats`);
+      });
+    }
+
+    // Tabs
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.getElementById(tab + 'Tab').classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // Modal
+    function openModal(id) {
+      document.getElementById(id + 'Modal').classList.add('show');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id + 'Modal').classList.remove('show');
+    }
+
+    // Actions
+    function suspendUser(id) {
+      const user = users.find(u => u.id === id);
+      if (user) {
+        user.status = user.status === 'active' ? 'suspended' : 'active';
+        renderUsers();
+      }
+    }
+
+    function createNewOffer() {
+      const brand = document.getElementById('newOfferBrand').value;
+      const title = document.getElementById('newOfferTitle').value;
+      const discount = document.getElementById('newOfferDiscount').value;
+      const limit = document.getElementById('newOfferLimit').value;
+      const exp = document.getElementById('newOfferExpiry').value;
+      
+      if (!brand || !title) {
+        alert('Please fill required fields');
+        return;
+      }
+      
+      offers.push({
+        title,
+        brand,
+        claims: 0,
+        limit: parseInt(limit) || 100,
+        exp,
+        status: 'active'
+      });
+      
+      renderOffers();
+      closeModal('createOffer');
+      document.getElementById('totalOffers').textContent = offers.length;
+    }
+
+    function searchAll(query) {
+      query = query.toLowerCase();
+      if (!query) return;
+      
+      // Highlight matches (demo)
+      console.log('Searching:', query);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

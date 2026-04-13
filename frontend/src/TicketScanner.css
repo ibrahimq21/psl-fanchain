@@ -1,0 +1,226 @@
+.ticket-scanner {
+  padding: 1rem;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.header-row h2 {
+  text-align: left;
+  margin-bottom: 0;
+  color: #00d4ff;
+}
+
+.wallet-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.wallet-btn:hover {
+  transform: scale(1.05);
+}
+
+.location-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: rgba(0, 212, 255, 0.15);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.coords {
+  font-family: monospace;
+  color: #00d4ff;
+}
+
+.scanner-area {
+  margin-bottom: 1rem;
+}
+
+.reader-box {
+  background: #000;
+  border-radius: 12px;
+  min-height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  overflow: hidden;
+}
+
+.reader-box video {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.placeholder {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.placeholder .icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.scanner-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.scan-btn, .manual-btn {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.scan-btn {
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+  color: #fff;
+}
+
+.stop-btn {
+  flex: 1;
+  padding: 0.75rem;
+  background: #ff4444;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.manual-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(0, 212, 255, 0.3);
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.result {
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.result.success {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 212, 255, 0.2));
+  border: 2px solid #00ff88;
+}
+
+.result.failed {
+  background: linear-gradient(135deg, rgba(255, 68, 68, 0.2), rgba(255, 165, 0, 0.2));
+  border: 2px solid #ff4444;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.result-header .icon {
+  font-size: 2.5rem;
+}
+
+.result-header h3 {
+  font-size: 1.5rem;
+  letter-spacing: 2px;
+}
+
+.result-details {
+  padding: 1rem;
+}
+
+.result-details p {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.ticket-info {
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ticket-info p {
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+.reset-btn {
+  width: 100%;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.instructions {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.instructions h4 {
+  margin-bottom: 0.5rem;
+  color: #00d4ff;
+}
+
+.instructions ol {
+  margin: 0;
+  padding-left: 1.5rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.instructions li {
+  margin: 0.25rem 0;
+}

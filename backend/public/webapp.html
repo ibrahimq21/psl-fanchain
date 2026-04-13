@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSL FanChain - Check In</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding-bottom: 70px; }
+    .header { background: linear-gradient(135deg, #1a5f2a, #2e7d32); color: white; padding: 15px; text-align: center; }
+    .header h1 { font-size: 18px; }
+    
+    .card { background: white; margin: 10px; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .card h2 { font-size: 14px; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .stadium-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stadium-btn { 
+      padding: 15px 10px; border: 2px solid #e0e0e0; border-radius: 10px; 
+      text-align: center; cursor: pointer; background: white; transition: all 0.2s;
+    }
+    .stadium-btn:hover { border-color: #4caf50; }
+    .stadium-btn.selected { border-color: #1a5f2a; background: #e8f5e9; box-shadow: 0 0 0 2px rgba(26,95,42,0.2); }
+    .stadium-btn h3 { font-size: 13px; color: #1a5f2a; margin-bottom: 4px; }
+    .stadium-btn p { font-size: 11px; color: #888; }
+    
+    .location-box { background: linear-gradient(135deg, #e3f2fd, #bbdefb); padding: 12px; border-radius: 8px; font-size: 14px; text-align: center; color: #1565c0; }
+    
+    .check-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+    .check-row:last-child { border-bottom: none; }
+    .check-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 14px; font-weight: bold; }
+    .check-icon.ok { background: #c8e6c9; color: #2e7d32; }
+    .check-icon.bad { background: #ffcdd2; color: #c62828; }
+    .check-text { font-size: 14px; color: #333; }
+    
+    .checkin-btn { 
+      display: block; width: calc(100% - 20px); margin: 15px 10px; 
+      padding: 16px; background: linear-gradient(135deg, #1a5f2a, #2e7d32); color: white; 
+      border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(26,95,42,0.3); transition: transform 0.1s;
+    }
+    .checkin-btn:active { transform: scale(0.98); }
+    
+    .bottom-nav { 
+      position: fixed; bottom: 0; left: 0; right: 0; 
+      background: white; display: flex; border-top: 1px solid #e0e0e0; 
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100;
+    }
+    .nav-btn { 
+      flex: 1; padding: 12px 5px; text-align: center; 
+      background: none; border: none; font-size: 11px; color: #757575; cursor: pointer;
+    }
+    .nav-btn.active { color: #1a5f2a; }
+    .nav-btn span { display: block; font-size: 20px; margin-bottom: 2px; }
+    
+    .tab-view { display: none; }
+    .tab-view.active { display: block; }
+    
+    /* Map styles */
+    #map-div { height: 380px; border-radius: 10px; }
+    
+    /* QR styles */
+    #qr-video { width: 100%; height: 280px; object-fit: cover; border-radius: 10px; background: #000; }
+    .qr-status { text-align: center; margin: 12px 0; padding: 10px; background: #f5f5f5; border-radius: 8px; font-size: 13px; }
+    .qr-status.error { background: #ffebee; color: #c62828; }
+    .qr-status.success { background: #e8f5e9; color: #2e7d32; }
+    
+    .demo-qr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .demo-qr button { padding: 12px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .demo-qr button:active { background: #e0e0e0; }
+    
+    /* History */
+    .history-item { padding: 12px 0; border-bottom: 1px solid #eee; }
+    .history-item:last-child { border-bottom: none; }
+    .history-item h3 { font-size: 14px; color: #333; }
+    .history-item p { font-size: 12px; color: #888; margin-top: 4px; }
+    
+    /* Points */
+    .points-display { text-align: center; padding: 30px; }
+    .points-value { font-size: 48px; font-weight: bold; color: #1a5f2a; }
+    .points-label { font-size: 14px; color: #888; }
+    
+    .reward-item { padding: 12px 0; border-bottom: 1px solid #eee; display: flex; align-items: center; }
+    .reward-icon { font-size: 24px; margin-right: 12px; }
+    .reward-info h3 { font-size: 14px; }
+    .reward-info p { font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🏏 PSL FanChain</h1>
+  </div>
+
+  <!-- HOME TAB -->
+  <div id="home" class="tab-view active">
+    <div class="card">
+      <h2>Select Stadium</h2>
+      <div class="stadium-grid">
+        <div class="stadium-btn selected" id="btn-lahore" onclick="selectStadium('lahore')">
+          <h3>Gaddafi Stadium</h3>
+          <p>Lahore</p>
+        </div>
+        <div class="stadium-btn" id="btn-karachi" onclick="selectStadium('karachi')">
+          <h3>National Stadium</h3>
+          <p>Karachi</p>
+        </div>
+        <div class="stadium-btn" id="btn-rawalpindi" onclick="selectStadium('rawalpindi')">
+          <h3>Rawalpindi</h3>
+          <p>Rawalpindi</p>
+        </div>
+        <div class="stadium-btn" id="btn-peshawar" onclick="selectStadium('peshawar')">
+          <h3>Arbab Niaz</h3>
+          <p>Peshawar</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Your Location</h2>
+      <div class="location-box" id="locationBox">
+        <span>📍 Detecting...</span>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Security Status</h2>
+      <div class="check-row">
+        <div class="check-icon ok" id="icon-gps">✓</div>
+        <span class="check-text">Real GPS Location</span>
+      </div>
+      <div class="check-row">
+        <div class="check-icon ok" id="icon-mock">✓</div>
+        <span class="check-text">No Mock Location</span>
+      </div>
+      <div class="check-row">
+        <div class="check-icon ok" id="icon-device">✓</div>
+        <span class="check-text">Device Verified</span>
+      </div>
+    </div>
+    
+    <button class="checkin-btn" onclick="doCheckin()">📍 Check In Now</button>
+  </div>
+
+  <!-- MAP TAB -->
+  <div id="map" class="tab-view">
+    <div class="card">
+      <h2>Stadium Map</h2>
+      <div id="map-div"></div>
+    </div>
+  </div>
+
+  <!-- SCAN TAB -->
+  <div id="scan" class="tab-view">
+    <div class="card">
+      <h2>Scan QR Code</h2>
+      <video id="qr-video" playsinline autoplay muted></video>
+      <div class="qr-status" id="qrStatus">Tap Start to open camera</div>
+      <button class="checkin-btn" style="margin:5px 10px;" onclick="startCamera()">▶️ Start Camera</button>
+      <button class="checkin-btn" style="margin:5px 10px; background:#666;" onclick="stopCamera()">⏹️ Stop Camera</button>
+    </div>
+    <div class="card">
+      <h2>Or Use Demo</h2>
+      <div class="demo-qr">
+        <button onclick="simulateScan('PSL-lahore')">🏏 Lahore</button>
+        <button onclick="simulateScan('PSL-karachi')">🏏 Karachi</button>
+        <button onclick="simulateScan('PSL-rawalpindi')">🏏 Rawalpindi</button>
+        <button onclick="simulateScan('PSL-peshawar')">🏏 Peshawar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="history" class="tab-view">
+    <div class="card">
+      <h2>Check-in History</h2>
+      <div id="historyList">
+        <div class="history-item">
+          <h3>Gaddafi Stadium</h3>
+          <p>2 minutes ago • +10 points</p>
+        </div>
+        <div class="history-item">
+          <h3>Rawalpindi Stadium</h3>
+          <p>Yesterday • +10 points</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REWARDS TAB -->
+  <div id="rewards" class="tab-view">
+    <div class="card">
+      <div class="points-display">
+        <div class="points-value" id="totalPoints">30</div>
+        <div class="points-label">Total Points</div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="text-align:center; padding:10px;">
+        <a href="/influencer.html" style="display:inline-block; padding:12px 20px; background:linear-gradient(135deg,#7c3aed,#a855f7); color:white; text-decoration:none; border-radius:8px; font-weight:bold;">
+          🎯 Become Influencer
+        </a>
+        <p style="font-size:11px; color:#888; margin-top:8px;">Join referral program & earn!</p>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Your Rewards</h2>
+      <div class="reward-item">
+        <div class="reward-icon">🎫</div>
+        <div class="reward-info">
+          <h3>PSLFan NFT #001</h3>
+          <p>Genesis Fan Badge</p>
+        </div>
+      </div>
+      <div class="reward-item">
+        <div class="reward-icon">🏆</div>
+        <div class="reward-info">
+          <h3>Match Attendee</h3>
+          <p>Attend 3+ matches</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-home" onclick="switchTab('home')"><span>🏠</span>Home</button>
+    <button class="nav-btn" id="nav-map" onclick="switchTab('map')"><span>🗺️</span>Map</button>
+    <button class="nav-btn" id="nav-scan" onclick="switchTab('scan')"><span>📷</span>Scan</button>
+    <button class="nav-btn" id="nav-history" onclick="switchTab('history')"><span>📋</span>History</button>
+    <button class="nav-btn" id="nav-rewards" onclick="switchTab('rewards')"><span>🏆</span>Rewards</button>
+  </div>
+
+  <script>
+    // State
+    var selectedStadium = 'lahore';
+    var points = 30;
+    var userLat = 33.6844, userLng = 73.0479;
+    var map, qrStream, qrCanvas, qrContext, qrScanning = false;
+    
+    // Stadium data
+    var stadiums = {
+      'lahore': { name: 'Gaddafi Stadium', lat: 31.5080, lng: 74.3333, city: 'Lahore' },
+      'karachi': { name: 'National Stadium Karachi', lat: 24.8910, lng: 67.0755, city: 'Karachi' },
+      'rawalpindi': { name: 'Rawalpindi Cricket Stadium', lat: 33.6517, lng: 73.0785, city: 'Rawalpindi' },
+      'peshawar': { name: 'Arbab Niaz Stadium', lat: 34.0151, lng: 71.5805, city: 'Peshawar' }
+    };
+    
+    // Calculate distance
+    function getDistance(lat1, lng1, lat2, lng2) {
+      var R = 6371;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLng = (lng2 - lng1) * Math.PI / 180;
+      var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    
+    // Get location
+    function initLocation() {
+      var locBox = document.getElementById('locationBox');
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            userLat = pos.coords.latitude;
+            userLng = pos.coords.longitude;
+            var acc = Math.round(pos.coords.accuracy);
+            locBox.innerHTML = '<span>📍 ' + userLat.toFixed(4) + ', ' + userLng.toFixed(4) + ' (±' + acc + 'm)</span>';
+          },
+          function(err) {
+            locBox.innerHTML = '<span>📍 Islamabad (default)</span>';
+          },
+          { enableHighAccuracy: true, timeout: 15000 }
+        );
+      } else {
+        locBox.innerHTML = '<span>📍 GPS not supported</span>';
+      }
+    }
+    
+    // Select stadium
+    function selectStadium(id) {
+      selectedStadium = id;
+      // Update UI
+      var btns = document.querySelectorAll('.stadium-btn');
+      btns.forEach(function(b) { b.classList.remove('selected'); });
+      document.getElementById('btn-' + id).classList.add('selected');
+    }
+    
+    // Switch tab
+    function switchTab(tabId) {
+      // Hide all tabs
+      var tabs = document.querySelectorAll('.tab-view');
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      
+      // Show selected
+      document.getElementById(tabId).classList.add('active');
+      
+      // Update nav
+      var navs = document.querySelectorAll('.nav-btn');
+      navs.forEach(function(n) { n.classList.remove('active'); });
+      document.getElementById('nav-' + tabId).classList.add('active');
+      
+      // Initialize map if needed
+      if (tabId === 'map' && !map) {
+        setTimeout(initMap, 200);
+      }
+    }
+    
+    // Initialize map
+    function initMap() {
+      var container = document.getElementById('map-div');
+      if (!container || map) return;
+      
+      try {
+        map = L.map('map-div').setView([30.0, 69.0], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+        
+        // Add stadium markers
+        Object.keys(stadiums).forEach(function(key) {
+          var s = stadiums[key];
+          L.marker([s.lat, s.lng]).addTo(map).bindPopup('<b>' + s.name + '</b><br>' + s.city);
+          
+          // Add circle
+          L.circle([s.lat, s.lng], { radius: 500, color: '#1a5f2a', fillColor: '#1a5f2a', fillOpacity: 0.1 })
+            .addTo(map).bindPopup('<b>500m Zone</b><br>' + s.name);
+        });
+      } catch(e) {
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Map error: ' + e.message + '</div>';
+      }
+    }
+    
+    // Camera functions
+    function startCamera() {
+      var video = document.getElementById('qr-video');
+      var status = document.getElementById('qrStatus');
+      
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        status.textContent = '📷 Requesting camera...';
+        status.className = 'qr-status';
+        
+        navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } 
+        })
+        .then(function(stream) {
+          qrStream = stream;
+          video.srcObject = stream;
+          video.play();
+          status.textContent = '📷 Point at QR code...';
+          qrScanning = true;
+          scanQR();
+        })
+        .catch(function(err) {
+          status.textContent = '❌ Camera error: ' + err.message;
+          status.className = 'qr-status error';
+        });
+      } else {
+        status.textContent = '❌ Camera not supported';
+        status.className = 'qr-status error';
+      }
+    }
+    
+    function scanQR() {
+      if (!qrScanning || !qrStream) return;
+      
+      var video = document.getElementById('qr-video');
+      var status = document.getElementById('qrStatus');
+      
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (!qrCanvas) {
+          qrCanvas = document.createElement('canvas');
+          qrContext = qrCanvas.getContext('2d');
+        }
+        
+        qrCanvas.width = video.videoWidth;
+        qrCanvas.height = video.videoHeight;
+        qrContext.drawImage(video, 0, 0, qrCanvas.width, qrCanvas.height);
+        
+        var imageData = qrContext.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+        
+        if (typeof jsQR === 'function') {
+          var code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code && code.data) {
+            status.textContent = '✅ Found: ' + code.data;
+            status.className = 'qr-status success';
+            simulateScan(code.data);
+            return;
+          }
+        }
+      }
+      
+      requestAnimationFrame(scanQR);
+    }
+    
+    function stopCamera() {
+      qrScanning = false;
+      if (qrStream) {
+        qrStream.getTracks().forEach(function(t) { t.stop(); });
+        qrStream = null;
+      }
+      document.getElementById('qrStatus').textContent = '⏹️ Camera stopped';
+      document.getElementById('qrStatus').className = 'qr-status';
+    }
+    
+    // Simulate scan
+    var lastScanned = null;
+    function simulateScan(code) {
+      // Prevent duplicate scans
+      if (lastScanned === code && Date.now() - lastScanTime < 5000) {
+        return;
+      }
+      lastScanned = code;
+      lastScanTime = Date.now();
+      
+      stopCamera();
+      
+      if (code.startsWith('PSL-')) {
+        var id = code.substring(4);
+        if (stadiums[id]) {
+          selectStadium(id);
+          switchTab('home');
+          
+          // Show scanned message on screen
+          var resultDiv = document.createElement('div');
+          resultDiv.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:20px 30px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:1000; text-align:center;';
+          resultDiv.innerHTML = '<div style="color:#1a5f2a; font-size:40px;">📷</div><div style="font-size:18px; font-weight:bold; margin:10px 0;">Scanned!</div><div style="font-size:14px; color:#666;">' + stadiums[id].name + '</div><br><button onclick="this.parentElement.remove()" style="background:#1a5f2a; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer;">OK</button>';
+          document.body.appendChild(resultDiv);
+        }
+      }
+    }
+    var lastScanTime = 0;
+    
+    // Check in
+    function doCheckin() {
+      var s = stadiums[selectedStadium];
+      var dist = getDistance(userLat, userLng, s.lat, s.lng) * 1000;
+      
+      // Show result on screen instead of alert
+      var resultDiv = document.getElementById('checkinResult');
+      if (!resultDiv) {
+        resultDiv = document.createElement('div');
+        resultDiv.id = 'checkinResult';
+        resultDiv.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:20px 30px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:1000; text-align:center;';
+        document.body.appendChild(resultDiv);
+      }
+      
+      if (dist > 500) {
+        // Demo mode - allow anyway
+        resultDiv.innerHTML = '<div style="color:#f59e0b; font-size:24px;">⚠️</div><div style="font-size:14px; margin:10px 0;">You are ' + Math.round(dist) + 'm away<br>from ' + s.name + '</div><button onclick="confirmCheckin()" style="background:#1a5f2a; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer;">Allow Anyway</button><br><br><button onclick="this.parentElement.style.display=none" style="background:#ccc; color:#333; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Cancel</button>';
+        resultDiv.style.display = 'block';
+        return;
+      }
+      
+      // Success!
+      showSuccess(s, dist);
+    }
+    
+    function confirmCheckin() {
+      var s = stadiums[selectedStadium];
+      var dist = getDistance(userLat, userLng, s.lat, s.lng) * 1000;
+      document.getElementById('checkinResult').style.display = 'none';
+      showSuccess(s, dist);
+    }
+    
+    function showSuccess(s, dist) {
+      points += 10;
+      document.getElementById('totalPoints').textContent = points;
+      
+      // Add to history
+      var history = document.getElementById('historyList');
+      var item = document.createElement('div');
+      item.className = 'history-item';
+      item.innerHTML = '<h3>' + s.name + '</h3><p>Just now • +10 points</p>';
+      history.insertBefore(item, history.firstChild);
+      
+      // Show success
+      var resultDiv = document.getElementById('checkinResult');
+      resultDiv.innerHTML = '<div style="color:#22c55e; font-size:40px;">✅</div><div style="font-size:18px; font-weight:bold; margin:10px 0;">Check-in Successful!</div><div style="font-size:14px; color:#666;">' + s.name + '</div><div style="font-size:14px; color:#888;">+' + Math.round(dist) + 'm • +10 Points</div><br><button onclick="this.parentElement.style.display=none" style="background:#1a5f2a; color:white; border:none; padding:12px 24px; border-radius:6px; cursor:pointer; font-size:14px;">OK</button>';
+      resultDiv.style.display = 'block';
+      
+      // Auto hide after 3 seconds
+      setTimeout(function() {
+        resultDiv.style.display = 'none';
+      }, 3000);
+    }
+    
+    // Initialize
+    window.onload = function() {
+      // Prevent page refresh
+      window.onbeforeunload = function() { };
+      
+      initLocation();
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{
+  "Rawalpindi Cricket Stadium": {
+    "city": "Rawalpindi",
+    "stadiumName": "Rawalpindi Cricket Stadium",
+    "coordinates": {
+      "lat": 33.7266,
+      "lng": 73.0718
+    },
+    "radius": 500
+  },
+  "Gaddafi Stadium": {
+    "city": "Lahore",
+    "stadiumName": "Gaddafi Stadium",
+    "coordinates": {
+      "lat": 31.5204,
+      "lng": 74.3587
+    },
+    "radius": 500
+  },
+  "National Stadium Karachi": {
+    "city": "Karachi",
+    "stadiumName": "National Stadium",
+    "coordinates": {
+      "lat": 24.8967,
+      "lng": 67.0817
+    },
+    "radius": 500
+  },
+  "Multan Cricket Stadium": {
+    "city": "Multan",
+    "stadiumName": "Multan Cricket Stadium",
+    "coordinates": {
+      "lat": 30.2032,
+      "lng": 71.4532
+    },
+    "radius": 500
+  },
+  "PCB Head Office": {
+    "city": "Lahore",
+    "stadiumName": "PCB Head Office",
+    "coordinates": {
+      "lat": 31.5285,
+      "lng": 74.3562
+    },
+    "radius": 300
+  },
+  "Vital Signs Concert - Lahore": {
+    "city": "Lahore",
+    "stadiumName": "Vital Signs Concert",
+    "coordinates": {
+      "lat": 31.5204,
+      "lng": 74.3587
+    },
+    "radius": 300,
+    "isEvent": true
+  },
+  "Junoon Tribute - Karachi": {
+    "city": "Karachi",
+    "stadiumName": "Junoon Tribute Concert",
+    "coordinates": {
+      "lat": 24.8967,
+      "lng": 67.0817
+    },
+    "radius": 300,
+    "isEvent": true
+  },
+  "PSL Final 2026": {
+    "city": "Rawalpindi",
+    "stadiumName": "PSL Final 2026",
+    "coordinates": {
+      "lat": 33.7266,
+      "lng": 73.0718
+    },
+    "radius": 300,
+    "isEvent": true
+  }
+}

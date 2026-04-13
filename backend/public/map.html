@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSL FanChain - Stadium Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; }
+    #map { height: 100vh; width: 100%; }
+    .stadium-popup { min-width: 220px; }
+    .stadium-popup h3 { color: #1a5f2a; margin-bottom: 8px; font-size: 15px; }
+    .stadium-popup p { margin: 4px 0; color: #555; font-size: 13px; }
+    .stadium-popup .coords { font-family: monospace; font-size: 11px; color: #888; }
+    .stadium-popup .distance { font-weight: bold; color: #1a5f2a; }
+    .stadium-popup .btn-row { display: flex; gap: 5px; margin-top: 8px; }
+    .stadium-popup .checkin-btn, .stadium-popup .directions-btn {
+      flex: 1; color: white; border: none;
+      padding: 8px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 13px;
+    }
+    .stadium-popup .checkin-btn { background: #1a5f2a; }
+    .stadium-popup .checkin-btn:hover { background: #2a7f3a; }
+    .stadium-popup .directions-btn { background: #2563eb; }
+    .stadium-popup .directions-btn:hover { background: #3b82f6; }
+    .header {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      background: white; padding: 10px 20px; border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header h1 { font-size: 18px; color: #1a5f2a; }
+    .legend {
+      position: absolute; bottom: 20px; left: 10px; z-index: 1000;
+      background: white; padding: 10px 15px; border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); font-size: 13px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .legend-dot.active { background: #22c55e; }
+    .legend-dot.stadium { background: #ef4444; }
+    .legend-dot.user { background: #3b82f6; border: 2px solid white; }
+    .locate-btn {
+      position: absolute; top: 10px; left: 10px; z-index: 1000;
+      background: white; padding: 8px 12px; border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); cursor: pointer;
+      font-size: 13px; border: none;
+    }
+    .locate-btn:hover { background: #f3f4f6; }
+  </style>
+</head>
+<body>
+  <button class="locate-btn" onclick="locateUser()">📍 My Location</button>
+  <div class="header">
+    <h1>🏏 PSL Stadiums</h1>
+  </div>
+  <div id="map"></div>
+  <div class="legend">
+    <strong>Legend</strong>
+    <div class="legend-item"><div class="legend-dot stadium"></div> Stadium</div>
+    <div class="legend-item"><div class="legend-dot user"></div> Your Location</div>
+    <div class="legend-item"><div class="legend-dot active"></div> Checked-in Fans</div>
+  </div>
+
+  <script>
+    let userLat = null, userLng = null;
+    let userMarker = null;
+    let routeLine = null;
+    let directionsLayer = null;
+
+    // Initialize map centered on Pakistan
+    const map = L.map('map').setView([30.0, 69.0], 5);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Custom icons
+    const stadiumIcon = L.divIcon({
+      className: 'stadium-marker',
+      html: '<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3)"></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+
+    const fanIcon = L.divIcon({
+      className: 'fan-marker',
+      html: '<div style="background:#22c55e;width:10px;height:10px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>',
+      iconSize: [10, 10],
+      iconAnchor: [5, 5]
+    });
+
+    const userIcon = L.divIcon({
+      className: 'user-marker',
+      html: '<div style="background:#3b82f6;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3)"></div>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+
+    // Stadium data
+    const stadiums = [
+      { id: 'lahore', name: 'Gaddafi Stadium', lat: 31.5080, lng: 74.3333 },
+      { id: 'karachi', name: 'National Stadium Karachi', lat: 24.8910, lng: 67.0755 },
+      { id: 'rawalpindi', name: 'Rawalpindi Cricket Stadium', lat: 33.6517, lng: 73.0785 },
+      { id: 'peshawar', name: 'Arbab Niaz Stadium', lat: 34.0151, lng: 71.5805 },
+      { id: 'quetta', name: 'Bugti Stadium', lat: 30.1798, lng: 66.9750 }
+    ];
+
+    // Calculate distance using Haversine
+    function getDistance(lat1, lng1, lat2, lng2) {
+      const R = 6371; // Earth's radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // Format distance
+    function formatDist(km) {
+      if (km < 1) return Math.round(km * 1000) + ' m';
+      return km.toFixed(1) + ' km';
+    }
+
+    // Get directions from OSRM
+    async function getDirections(startLng, startLat, endLng, endLat) {
+      const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.code === 'Ok' && data.routes.length > 0) {
+          return data.routes[0].geometry;
+        }
+      } catch (e) {
+        console.error('Directions error:', e);
+      }
+      return null;
+    }
+
+    // Add stadium markers
+    stadiums.forEach(s => {
+      const marker = L.marker([s.lat, s.lng], { icon: stadiumIcon }).addTo(map);
+      
+      // Calculate distance if user is located
+      let distHtml = '';
+      if (userLat && userLng) {
+        const dist = getDistance(userLat, userLng, s.lat, s.lng);
+        distHtml = `<p class="distance">📏 ${formatDist(dist)} away</p>`;
+      }
+      
+      const popup = `
+        <div class="stadium-popup">
+          <h3>${s.name}</h3>
+          <p class="coords">${s.lat}, ${s.lng}</p>
+          ${distHtml}
+          <p>Geo-fence: 500m</p>
+          <div class="btn-row">
+            <button class="directions-btn" onclick="getRoute('${s.id}', ${s.lat}, ${s.lng})">🧭 Navigate</button>
+            <button class="checkin-btn" onclick="checkIn('${s.id}')">📍 Check In</button>
+          </div>
+        </div>
+      `;
+      marker.bindPopup(popup);
+    });
+
+    // Get route to stadium
+    async function getRoute(stadiumId, stadiumLat, stadiumLng) {
+      if (!userLat || !userLng) {
+        alert('Please click "My Location" first to set your location.');
+        return;
+      }
+      
+      // Show loading
+      const popup = document.querySelector('.stadium-popup');
+      if (popup) popup.innerHTML = '<p>Getting directions...</p>';
+      
+      // Get route from OSRM
+      const route = await getDirections(userLng, userLat, stadiumLng, stadiumLat);
+      
+      // Remove old route
+      if (routeLine) map.removeLayer(routeLine);
+      
+      if (route) {
+        // Draw route
+        routeLine = L.geoJSON(route, {
+          style: { color: '#2563eb', weight: 4, opacity: 0.8 }
+        }).addTo(map);
+        
+        // Fit bounds to show whole route
+        map.fitBounds(routeLine.getBounds(), { padding: [20, 20] });
+      } else {
+        // Fallback: draw straight line
+        routeLine = L.polyline([
+          [userLat, userLng],
+          [stadiumLat, stadiumLng]
+        ], { color: '#2563eb', weight: 4, opacity: 0.5, dashArray: '10, 10' }).addTo(map);
+        
+        map.fitBounds([[userLat, userLng], [stadiumLat, stadiumLng]], { padding: [20, 20] });
+      }
+      
+      // Update popup with distance
+      const dist = getDistance(userLat, userLng, stadiumLat, stadiumLng);
+      alert(`🧭 Directions ready!\nDistance: ${formatDist(dist)}\n\nUse Google Maps or your preferred navigation app for turn-by-turn directions.`);
+    }
+
+    // Locate user
+    function locateUser() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          userLat = pos.coords.latitude;
+          userLng = pos.coords.longitude;
+          
+          // Remove old marker
+          if (userMarker) map.removeLayer(userMarker);
+          
+          // Add user marker
+          userMarker = L.marker([userLat, userLng], { icon: userIcon })
+            .addTo(map)
+            .bindPopup(`<b>📍 You are here</b><br>${userLat.toFixed(5)}, ${userLng.toFixed(5)}`);
+          userMarker.openPopup();
+          
+          // Zoom to user
+          map.setView([userLat, userLng], 12);
+          
+          // Update stadium popups with distance
+          updateDistances();
+        }, (err) => {
+          alert('Unable to get location: ' + err.message);
+        });
+      } else {
+        alert('Geolocation not supported');
+      }
+    }
+
+    // Update distances in all popups
+    function updateDistances() {
+      stadiums.forEach(s => {
+        const dist = getDistance(userLat, userLng, s.lat, s.lng);
+        // Open popup will show new distance
+      });
+    }
+
+    // Demo: Add some fake fan check-ins
+    const demoFans = [
+      { lat: 31.5195, lng: 74.3590 },
+      { lat: 31.5210, lng: 74.3580 },
+      { lat: 24.8610, lng: 66.9905 },
+      { lat: 33.6850, lng: 73.0480 }
+    ];
+    demoFans.forEach(f => L.marker([f.lat, f.lng], { icon: fanIcon }).addTo(map));
+
+    // Check-in function
+    async function checkIn(stadiumId) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          console.log(`Checking in at ${stadiumId}:`, latitude, longitude);
+          alert(`Checking in to ${stadiumId}...\n(lat: ${latitude}, lng: ${longitude})`);
+        }, (err) => {
+          alert('Unable to get location: ' + err.message);
+        });
+      } else {
+        alert('Geolocation not supported');
+      }
+    }
+
+    // Add geo-fence circles
+    stadiums.forEach(s => {
+      L.circle([s.lat, s.lng], {
+        radius: 500,
+        color: '#1a5f2a',
+        fillColor: '#1a5f2a',
+        fillOpacity: 0.1,
+        weight: 1
+      }).addTo(map);
+    });
+  </script>
+</body>
+</html>

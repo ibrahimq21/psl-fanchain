@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "@truffle/hdwallet-provider": "^2.1.15",
+    "hardhat": "^3.3.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.6",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.16.0"
+  }
+}

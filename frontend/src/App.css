@@ -1,0 +1,853 @@
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.header {
+  text-align: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 2rem;
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.tagline {
+  margin: 0.5rem 0 0;
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.nav {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav button {
+  background: transparent;
+  border: none;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.nav button.active {
+  background: rgba(0, 212, 255, 0.2);
+  color: #00d4ff;
+}
+
+.main {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.connect-section {
+  text-align: center;
+  padding: 3rem;
+}
+
+.connect-btn {
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  color: #fff;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.connect-btn:hover {
+  transform: scale(1.05);
+}
+
+.connect-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wallet-info {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.address {
+  font-family: monospace;
+  color: #00d4ff;
+}
+
+.message {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(0, 212, 255, 0.2);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.actions {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.checkin-btn, .stadium-btn {
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  color: #fff;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.checkin-btn:hover, .stadium-btn:hover {
+  transform: scale(1.02);
+}
+
+.checkin-btn:disabled, .stadium-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stadiums-list h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.stadium-btn {
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 1rem;
+  padding: 0.75rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.stat-card h3 {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.stat-value {
+  margin: 0.5rem 0 0;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #00d4ff;
+}
+
+.map-section, .scan-section, .profile-section {
+  margin-top: 1rem;
+}
+
+.map-section h3, .scan-section h3, .profile-section h3 {
+  margin-bottom: 1rem;
+}
+
+.user-distance {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: rgba(0, 212, 255, 0.15);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.distance-label {
+  color: #00d4ff;
+}
+
+.distance-value {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.stadium-distances {
+  margin-top: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.stadium-distances h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.distance-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.distance-item:last-child {
+  border-bottom: none;
+}
+
+.distance-item.in-zone {
+  background: rgba(0, 255, 136, 0.15);
+}
+
+.stadium-name {
+  font-size: 0.85rem;
+}
+
+.stadium-dist {
+  font-family: monospace;
+  color: #00d4ff;
+}
+
+.distance-item.in-zone .stadium-dist {
+  color: #00ff88;
+}
+
+.loading-location {
+  text-align: center;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.map-hint {
+  text-align: center;
+  font-size: 0.8rem;
+  opacity: 0.6;
+  margin-top: 0.5rem;
+}
+
+#qr-reader {
+  width: 100%;
+  border-radius: 15px;
+  overflow: hidden;
+  position: relative;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(123, 47, 247, 0.1), rgba(0, 212, 255, 0.1));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Custom QR Scanner Frame */
+#qr-reader > div {
+  position: relative;
+}
+
+#qr-reader video {
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+/* Scanner frame overlay */
+.qr-scanner-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.qr-scanner-frame::before,
+.qr-scanner-frame::after {
+  content: '';
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-color: #00d4ff;
+  border-style: solid;
+}
+
+.qr-scanner-frame::before {
+  top: 0;
+  left: 0;
+  border-width: 4px 0 0 4px;
+  border-radius: 8px 0 0 0;
+}
+
+.qr-scanner-frame::after {
+  top: 0;
+  right: 0;
+  border-width: 4px 4px 0 0;
+  border-radius: 0 8px 0 0;
+}
+
+.qr-frame-bottom-left,
+.qr-frame-bottom-right {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-color: #00d4ff;
+  border-style: solid;
+}
+
+.qr-frame-bottom-left {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 4px 4px;
+  border-radius: 0 0 0 8px;
+}
+
+.qr-frame-bottom-right {
+  bottom: 0;
+  right: 0;
+  border-width: 0 4px 4px 0;
+  border-radius: 0 0 8px 0;
+}
+
+/* Scanning animation */
+.qr-scan-line {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+  animation: scanLine 2s ease-in-out infinite;
+  box-shadow: 0 0 10px #00d4ff;
+}
+
+@keyframes scanLine {
+  0%, 100% { top: 10%; }
+  50% { top: 85%; }
+}
+
+/* Scanner UI improvements */
+#qr-reader__scan_region {
+  border: 2px solid rgba(0, 212, 255, 0.5);
+  border-radius: 12px;
+  min-height: 250px;
+}
+
+#qr-reader__scan_region video {
+  border-radius: 10px;
+}
+
+#qr-reader__dashboard {
+  padding: 0.5rem 0;
+}
+
+#qr-reader__dashboard_section_csr {
+  padding: 0.5rem;
+  background: rgba(0, 212, 255, 0.1);
+  border-radius: 8px;
+}
+
+#qr-reader__dashboard_section_live_scan {
+  padding: 0.75rem;
+  background: rgba(123, 47, 247, 0.15);
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+#qr-reader__status {
+  color: #00d4ff !important;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+}
+
+/* Hide default ugly buttons */
+#qr-reader__dashboard_section_builtin_csr select,
+#qr-reader__dashboard button {
+  background: linear-gradient(90deg, #7b2ff7, #00d4ff) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 0.5rem 1rem !important;
+  color: #fff !important;
+  margin: 0.25rem !important;
+}
+
+.qr-scanner-wrapper {
+  position: relative;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(123, 47, 247, 0.1), rgba(0, 212, 255, 0.1));
+  border-radius: 15px;
+  border: 2px solid rgba(0, 212, 255, 0.3);
+}
+
+/* Scanner video container - positions the frame */
+#qr-video-container {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  background: #000;
+}
+
+#qr-video-container video {
+  width: 100% !important;
+  height: auto !important;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+/* Scanner frame - positioned over video */
+.qr-scanner-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.qr-scanner-frame::before,
+.qr-scanner-frame::after {
+  content: '';
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-color: #00d4ff;
+  border-style: solid;
+}
+
+.qr-scanner-frame::before {
+  top: 0;
+  left: 0;
+  border-width: 4px 0 0 4px;
+  border-radius: 8px 0 0 0;
+}
+
+.qr-scanner-frame::after {
+  top: 0;
+  right: 0;
+  border-width: 4px 4px 0 0;
+  border-radius: 0 8px 0 0;
+}
+
+.qr-frame-bottom-left,
+.qr-frame-bottom-right {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-color: #00d4ff;
+  border-style: solid;
+}
+
+.qr-frame-bottom-left {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 4px 4px;
+  border-radius: 0 0 0 8px;
+}
+
+.qr-frame-bottom-right {
+  bottom: 0;
+  right: 0;
+  border-width: 0 4px 4px 0;
+  border-radius: 0 0 8px 0;
+}
+
+/* Scanning animation */
+.qr-scan-line {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+  animation: scanLine 2s ease-in-out infinite;
+  box-shadow: 0 0 10px #00d4ff;
+  top: 15%;
+}
+
+@keyframes scanLine {
+  0%, 100% { top: 15%; }
+  50% { top: 75%; }
+}
+
+.scan-result {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(0, 212, 255, 0.2);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.scan-result-actions {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(0, 255, 136, 0.15);
+  border-radius: 10px;
+  text-align: center;
+  border: 2px solid #00ff88;
+}
+
+.scan-result-actions p {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: #00ff88;
+}
+
+.scan-result button {
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  color: #fff;
+  border-radius: 50px;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.nfts-section, .checkins-section, .profile-section {
+  margin: 1.5rem 0;
+}
+
+.nfts-section h2, .checkins-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.nfts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.5rem;
+}
+
+.nft-card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.nft-icon {
+  font-size: 1.5rem;
+}
+
+.checkins-list {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.checkin-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.9rem;
+}
+
+.checkin-item:last-child {
+  border-bottom: none;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  background: #1a1a2e;
+  font-family: inherit;
+}
+
+/* Ticket Verification Section */
+.ticket-section h3 {
+  text-align: center;
+  margin-bottom: 1rem;
+  color: #00d4ff;
+}
+
+.ticket-location {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: rgba(0, 212, 255, 0.15);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.ticket-location .coords {
+  font-family: monospace;
+  color: #00d4ff;
+}
+
+.ticket-scan-area {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ticket-reader-box {
+  background: #000;
+  border-radius: 10px;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(0, 212, 255, 0.3);
+}
+
+.ticket-controls {
+  margin-top: 1rem;
+}
+
+.ticket-methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.method-btn {
+  padding: 1rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.method-btn.nfc {
+  background: linear-gradient(135deg, #00d4ff, #0099cc);
+  color: #fff;
+}
+
+.method-btn.qr {
+  background: linear-gradient(135deg, #7b2ff7, #5a1db8);
+  color: #fff;
+}
+
+.method-btn:hover {
+  transform: scale(1.02);
+}
+
+.method-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ticket-instructions {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.ticket-instructions h4 {
+  margin-bottom: 0.75rem;
+  color: #00d4ff;
+}
+
+.ticket-instructions ol {
+  margin: 0;
+  padding-left: 1.5rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.ticket-instructions li {
+  margin: 0.35rem 0;
+}
+
+.nfc-note {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: #00d4ff;
+  opacity: 0.8;
+}
+
+/* ==================== REWARDS SECTION ==================== */
+.rewards-section {
+  padding: 1rem;
+}
+
+.rewards-section h2 {
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.fan-score-banner {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #333;
+}
+
+.score-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tier-badge {
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.score {
+  font-size: 1.1rem;
+  color: #ffd700;
+}
+
+.reward-category {
+  margin-bottom: 1.5rem;
+}
+
+.reward-category h3 {
+  color: #ccc;
+  margin-bottom: 0.75rem;
+}
+
+.rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.reward-card {
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.reward-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.reward-card h4 {
+  color: #fff;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.reward-cost {
+  color: #ffd700;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.stock {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.rarity {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.rarity.common { background: #cd7f32; }
+.rarity.rare { background: #c0c0c0; color: #000; }
+.rarity.epic { background: #9932cc; }
+.rarity.legendary { background: #ffd700; color: #000; }
+
+.redeem-btn {
+  margin-top: 0.75rem;
+  width: 100%;
+  padding: 0.5rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.redeem-btn:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+}
+
+/* ==================== LEADERBOARD SECTION ==================== */
+.leaderboard-section {
+  padding: 1rem;
+}
+
+.leaderboard-section h2 {
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #1a1a2e;
+  border-radius: 12px;
+  border: 1px solid #333;
+}
+
+.leaderboard-item.rank-1 { border-color: #ffd700; background: linear-gradient(135deg, #1a1a2e 0%, #2a2a1e 100%); }
+.leaderboard-item.rank-2 { border-color: #c0c0c0; }
+.leaderboard-item.rank-3 { border-color: #cd7f32; }
+
+.leaderboard-item .rank {
+  font-size: 1.25rem;
+  width: 40px;
+}
+
+.leaderboard-item .wallet {
+  flex: 1;
+  color: #ccc;
+  font-family: monospace;
+}
+
+.leaderboard-item .score {
+  color: #ffd700;
+  font-weight: 600;
+}
+
+.empty {
+  text-align: center;
+  color: #666;
+  padding: 2rem;
+}

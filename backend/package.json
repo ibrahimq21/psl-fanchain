@@ -1,0 +1,22 @@
+{
+  "name": "psl-fanchain-backend",
+  "version": "1.0.0",
+  "description": "PSL FanChain - Geo Validation + Risk Engine Backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "body-parser": "^2.2.2",
+    "cors": "^2.8.6",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^17.4.1",
+    "ethers": "^6.16.0",
+    "express": "^4.22.1",
+    "js-yaml": "^4.1.0",
+    "mysql2": "^3.22.0",
+    "uuid": "^9.0.0",
+    "web3": "^1.10.0"
+  }
+}

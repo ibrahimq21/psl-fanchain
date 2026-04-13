@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSL FanChain - Influencer Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding-bottom: 70px; }
+    .header { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 15px; text-align: center; }
+    .header h1 { font-size: 18px; }
+    .header .wallet { font-size: 12px; opacity: 0.9; }
+    
+    .card { background: white; margin: 10px; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .card h2 { font-size: 14px; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .stat-box { text-align: center; padding: 15px 5px; background: #f8fafc; border-radius: 8px; }
+    .stat-box .value { font-size: 20px; font-weight: bold; color: #7c3aed; }
+    .stat-box .label { font-size: 10px; color: #888; margin-top: 4px; }
+    
+    .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-card { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 15px; border-radius: 10px; text-align: center; }
+    .stat-card .value { font-size: 28px; font-weight: bold; }
+    .stat-card .label { font-size: 12px; opacity: 0.9; }
+    
+    .qr-section { text-align: center; padding: 15px; background: #f8fafc; border-radius: 10px; }
+    .qr-code { width: 150px; height: 150px; background: white; margin: 10px auto; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 2px dashed #ccc; }
+    .qr-code img { max-width: 100%; }
+    .ref-link { background: white; padding: 8px; border-radius: 6px; font-size: 11px; word-break: break-all; border: 1px solid #ddd; margin: 8px 0; }
+    
+    .btn { display: block; width: 100%; padding: 12px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; margin: 8px 0; }
+    .btn:active { transform: scale(0.98); }
+    .btn-secondary { background: #64748b; }
+    
+    .pool-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+    .pool-rank { width: 30px; font-weight: bold; color: #7c3aed; }
+    .pool-avatar { width: 36px; height: 36px; border-radius: 50%; background: #ddd; margin-right: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .pool-info { flex: 1; }
+    .pool-info h4 { font-size: 14px; }
+    .pool-info p { font-size: 12px; color: #888; }
+    .pool-points { font-weight: bold; color: #7c3aed; }
+    
+    .bounty-item { padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; margin-bottom: 10px; }
+    .bounty-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .bounty-brand { font-weight: bold; color: #333; }
+    .bounty-reward { background: #22c55e; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+    .bounty-progress { margin-top: 8px; }
+    .progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #7c3aed; border-radius: 4px; }
+    .bounty-meta { display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 4px; }
+    
+    .challenge-item { display: flex; align-items: center; padding: 10px; background: #fef3c7; border-radius: 8px; margin-bottom: 8px; }
+    .challenge-icon { font-size: 24px; margin-right: 10px; }
+    .challenge-info { flex: 1; }
+    .challenge-info h4 { font-size: 13px; }
+    .challenge-info p { font-size: 11px; color: #888; }
+    
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid #e0e0e0; z-index: 100; }
+    .nav-btn { flex: 1; padding: 12px 5px; text-align: center; background: none; border: none; font-size: 11px; color: #757575; cursor: pointer; }
+    .nav-btn.active { color: #7c3aed; }
+    .nav-btn span { display: block; font-size: 20px; margin-bottom: 2px; }
+    
+    .tab-view { display: none; }
+    .tab-view.active { display: block; }
+    
+    .fan-pool-banner { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+    .fan-pool-banner h3 { font-size: 16px; }
+    .fan-pool-banner p { font-size: 12px; opacity: 0.9; }
+    
+    .tab-btn { display: inline-block; padding: 8px 16px; background: #f0f0f0; border: none; border-radius: 20px; font-size: 12px; margin: 2px; cursor: pointer; }
+    .tab-btn.active { background: #7c3aed; color: white; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎯 Influencer Dashboard</h1>
+    <div class="wallet">0x7a3f...9f (You)</div>
+  </div>
+
+  <!-- DASHBOARD TAB -->
+  <div id="dashboard" class="tab-view active">
+    <div class="card">
+      <h2>Earnings Overview</h2>
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="value" id="totalEarnings">₨ 12,450</div>
+          <div class="label">Total Earned</div>
+        </div>
+        <div class="stat-card">
+          <div class="value" id="pendingEarnings">₨ 2,100</div>
+          <div class="label">Pending</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Your Stats</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="value" id="totalFans">847</div>
+          <div class="label">Total Fans</div>
+        </div>
+        <div class="stat-box">
+          <div class="value" id="totalCheckins">234</div>
+          <div class="label">Check-ins</div>
+        </div>
+        <div class="stat-box">
+          <div class="value" id="conversionRate">27%</div>
+          <div class="label">Conversion</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Your Referral QR</h2>
+      <div class="qr-section">
+        <div class="qr-code" id="qrCode">
+          <span style="font-size:12px; color:#888;">Generate below</span>
+        </div>
+        <div class="ref-link" id="refLink">psl-fan.com/join?ref=0x7a3f</div>
+        <button class="btn" onclick="generateQR()">🔄 Generate New QR</button>
+        <button class="btn btn-secondary" onclick="downloadQR()">⬇️ Download QR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAN POOL TAB -->
+  <div id="fanpool" class="tab-view">
+    <div class="card">
+      <div class="fan-pool-banner">
+        <h3>🏆 Team CricketKing</h3>
+        <p>Your fan pool • 847 members</p>
+      </div>
+      
+      <h2>Top Fans This Match</h2>
+      <div id="leaderboard">
+        <div class="pool-item">
+          <div class="pool-rank">1</div>
+          <div class="pool-avatar">🧑</div>
+          <div class="pool-info">
+            <h4>Ahmed Raza</h4>
+            <p>12 check-ins</p>
+          </div>
+          <div class="pool-points">2,450 pts</div>
+        </div>
+        <div class="pool-item">
+          <div class="pool-rank">2</div>
+          <div class="pool-avatar">👩</div>
+          <div class="pool-info">
+            <h4>Fatima Khan</h4>
+            <p>10 check-ins</p>
+          </div>
+          <div class="pool-points">2,100 pts</div>
+        </div>
+        <div class="pool-item">
+          <div class="pool-rank">3</div>
+          <div class="pool-avatar">🧑</div>
+          <div class="pool-info">
+            <h4>Ali Sheikh</h4>
+            <p>8 check-ins</p>
+          </div>
+          <div class="pool-points">1,800 pts</div>
+        </div>
+        <div class="pool-item">
+          <div class="pool-rank">4</div>
+          <div class="pool-avatar">👩</div>
+          <div class="pool-info">
+            <h4>Sara Ahmed</h4>
+            <p>6 check-ins</p>
+          </div>
+          <div class="pool-points">1,200 pts</div>
+        </div>
+        <div class="pool-item">
+          <div class="pool-rank">5</div>
+          <div class="pool-avatar">🧑</div>
+          <div class="pool-info">
+            <h4>Usman Malik</h4>
+            <p>5 check-ins</p>
+          </div>
+          <div class="pool-points">950 pts</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHALLENGES TAB -->
+  <div id="challenges" class="tab-view">
+    <div class="card">
+      <h2>Active Challenges</h2>
+      
+      <div class="challenge-item">
+        <div class="challenge-icon">🎯</div>
+        <div class="challenge-info">
+          <h4>Find Me in Section A</h4>
+          <p>Scan my QR at Gaddafi Stadium today</p>
+        </div>
+        <div style="font-weight:bold; color:#7c3aed;">+500 pts</div>
+      </div>
+      
+      <div class="challenge-item">
+        <div class="challenge-icon">📸</div>
+        <div class="challenge-info">
+          <h4>Match Selfie Challenge</h4>
+          <p>Upload photo from stadium stands</p>
+        </div>
+        <div style="font-weight:bold; color:#7c3aed;">+200 pts</div>
+      </div>
+      
+      <div class="challenge-item">
+        <div class="challenge-icon">🎉</div>
+        <div class="challenge-info">
+          <h4>Bring 5 Friends</h4>
+          <p>Refer 5 friends who check-in</p>
+        </div>
+        <div style="font-weight:bold; color:#7c3aed;">+1000 pts</div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Today's Mission</h2>
+      <div style="padding:15px; background: linear-gradient(135deg, #22c55e, #16a34a); border-radius:10px; color: white; text-align:center;">
+        <div style="font-size:40px;">🎯</div>
+        <h3 style="margin:10px 0;">Get 20 Check-ins Today!</h3>
+        <p>Current: 12/20</p>
+        <div style="background:rgba(255,255,255,0.3); height:10px; border-radius:5px; margin-top:10px;">
+          <div style="background:white; height:100%; width:60%; border-radius:5px;"></div>
+        </div>
+        <p style="margin-top:10px; font-size:12px;">Reward: ₨ 2,000 + VIP Pass</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOUNTIES TAB -->
+  <div id="bounties" class="tab-view">
+    <div class="card">
+      <h2>Campaign Bounties</h2>
+      
+      <div class="bounty-item">
+        <div class="bounty-header">
+          <span class="bounty-brand">🍔 Gaddafi Grill</span>
+          <span class="bounty-reward">₨ 5,000</span>
+        </div>
+        <div style="font-size:13px;">Bring 50 verified fans to Lahore match</div>
+        <div class="bounty-progress">
+          <div class="progress-bar"><div class="progress-fill" style="width:60%;"></div></div>
+          <div class="bounty-meta">
+            <span>30/50 fans</span>
+            <span>60%</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bounty-item">
+        <div class="bounty-header">
+          <span class="bounty-brand">🥤 Coca Cola</span>
+          <span class="bounty-reward">₨ 8,000</span>
+        </div>
+        <div style="font-size:13px;">100 photo uploads from stadium</div>
+        <div class="bounty-progress">
+          <div class="progress-bar"><div class="progress-fill" style="width:35%;"></div></div>
+          <div class="bounty-meta">
+            <span>35/100 photos</span>
+            <span>35%</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bounty-item">
+        <div class="bounty-header">
+          <span class="bounty-brand">🚗 Careem</span>
+          <span class="bounty-reward">₨ 3,000</span>
+        </div>
+        <div style="font-size:13px;">20 first-time users sign up</div>
+        <div class="bounty-progress">
+          <div class="progress-bar"><div class="progress-fill" style="width:85%;"></div></div>
+          <div class="bounty-meta">
+            <span>17/20 users</span>
+            <span>85%</span>
+          </div>
+        </div>
+      </div>
+      
+      <button class="btn">+ Create New Bounty</button>
+    </div>
+  </div>
+
+  <!-- CAMPAIGNS TAB -->
+  <div id="campaigns" class="tab-view">
+    <div class="card">
+      <h2>Create Campaign</h2>
+      
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Campaign Type</label>
+        <select style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-size:14px;">
+          <option>Geo-Challenge</option>
+          <option>Referral</option>
+          <option>Content Mission</option>
+          <option>Prediction Contest</option>
+        </select>
+      </div>
+      
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Campaign Title</label>
+        <input type="text" placeholder="e.g., Find me at Section A!" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-size:14px;">
+      </div>
+      
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Description</label>
+        <textarea placeholder="What should fans do?" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-size:14px; min-height:80px;"></textarea>
+      </div>
+      
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+        <div>
+          <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Reward</label>
+          <input type="text" placeholder="e.g., 500 pts" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-size:14px;">
+        </div>
+        <div>
+          <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Max Participants</label>
+          <input type="number" placeholder="100" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-size:14px;">
+        </div>
+      </div>
+      
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Stadium</label>
+        <select style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-size:14px;">
+          <option>All Stadiums</option>
+          <option>Gaddafi Stadium (Lahore)</option>
+          <option>National Stadium (Karachi)</option>
+          <option>Rawalpindi Stadium</option>
+        </select>
+      </div>
+      
+      <button class="btn" onclick="alert('Campaign created! 🎉')">🚀 Launch Campaign</button>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-dashboard" onclick="switchTab('dashboard')"><span>📊</span>Dashboard</button>
+    <button class="nav-btn" id="nav-fanpool" onclick="switchTab('fanpool')"><span>👥</span>Fan Pool</button>
+    <button class="nav-btn" id="nav-challenges" onclick="switchTab('challenges')"><span>🎯</span>Challenges</button>
+    <button class="nav-btn" id="nav-bounties" onclick="switchTab('bounties')"><span>💰</span>Bounties</button>
+    <button class="nav-btn" id="nav-campaigns" onclick="switchTab('campaigns')"><span>⚡</span>Create</button>
+  </div>
+
+  <script>
+    // State
+    var walletAddress = '0x7a3f';
+    var totalFans = 847;
+    var totalCheckins = 234;
+    var totalEarnings = 12450;
+    var pendingEarnings = 2100;
+    
+    // Tab switching
+    function switchTab(tabId) {
+      var tabs = document.querySelectorAll('.tab-view');
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      document.getElementById(tabId).classList.add('active');
+      
+      var navs = document.querySelectorAll('.nav-btn');
+      navs.forEach(function(n) { n.classList.remove('active'); });
+      document.getElementById('nav-' + tabId).classList.add('active');
+    }
+    
+    // Generate QR
+    function generateQR() {
+      var refCode = 'PSL-' + walletAddress + '-' + Date.now().toString(36).toUpperCase();
+      var refUrl = 'psl-fan.com/join?ref=' + refCode;
+      
+      // Update link
+      document.getElementById('refLink').textContent = refUrl;
+      
+      // Generate QR using API
+      var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(refUrl);
+      
+      document.getElementById('qrCode').innerHTML = '<img src="' + qrUrl + '" alt="QR Code">';
+      
+      alert('✅ New QR Generated!\n\nShare this QR to earn:\n• ₨ 50 per fan sign-up\n• ₨ 100 per verified check-in');
+    }
+    
+    // Download QR
+    function downloadQR() {
+      var img = document.querySelector('#qrCode img');
+      if (!img) {
+        alert('Generate QR first!');
+        return;
+      }
+      
+      var link = document.createElement('a');
+      link.href = img.src;
+      link.download = 'psl-influencer-qr.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+    // Initialize
+    window.onload = function() {
+      generateQR();
+    };
+  </script>
+</body>
+</html>
