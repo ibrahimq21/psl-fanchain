@@ -1,9 +1,5 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "build",
-  "installCommand": "npm install",
-  "rootDirectory": "frontend",
-  "env": {
-    "REACT_APP_API_URL": "https://psl-fanchain.onrender.com"
-  }
+  "installCommand": "npm install"
 }
