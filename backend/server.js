@@ -842,33 +842,33 @@ app.post('/verify', async (req, res) => {
   
   checkInStore.push(checkIn);
   
-  // Mint NFT on blockchain (no fallback - throws on failure)
-  let blockchainResult;
+  // Try to mint NFT on blockchain (graceful fallback)
+  let blockchainResult = null;
   try {
-    blockchainResult = await mintNFTOnChain(
-      payload.deviceId || 'unknown',
-      payload.stadiumId,
-      payload.stadiumId,
-      stadium.name,
-      payload.lat,
-      payload.lng
-    );
+    if (process.env.PRIVATE_KEY) {
+      blockchainResult = await mintNFTOnChain(
+        payload.deviceId || 'unknown',
+        payload.stadiumId,
+        payload.stadiumId,
+        stadium.name,
+        payload.lat,
+        payload.lng
+      );
+    } else {
+      console.log('⚠️ PRIVATE_KEY not set - skipping NFT mint');
+      blockchainResult = { success: false, skipped: true, message: 'NFT minting not configured' };
+    }
   } catch (blockchainErr) {
-    // If blockchain mint fails, return error
-    console.log('❌ Blockchain mint failed:', blockchainErr.message);
-    return res.status(500).json({
-      success: false,
-      checkIn,
-      blockchain: { success: false, error: blockchainErr.message },
-      message: 'Check-in verified but NFT minting failed'
-    });
+    console.log('⚠️ Blockchain mint failed:', blockchainErr.message);
+    blockchainResult = { success: false, error: blockchainErr.message };
+  }
   }
   
   res.json({
     success: true,
     checkIn,
     blockchain: blockchainResult,
-    message: 'Check-in verified and NFT minted!'
+    message: blockchainResult?.success ? 'Check-in verified and NFT minted!' : 'Check-in verified successfully'
   });
 });
 
