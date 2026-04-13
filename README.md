@@ -115,6 +115,42 @@ Tables: users, roles, permissions, reports, moderation_actions, banned_entities,
 
 ---
 
+## 📱 Deployment
+
+### Vercel (Frontend)
+
+```bash
+cd frontend
+
+# Install Vercel CLI
+npm i -g vercel
+
+# Login to Vercel
+vercel login
+
+# Deploy
+vercel
+```
+
+**Or connect GitHub repo to Vercel:**
+1. Go to https://vercel.com
+2. Import your GitHub repo
+3. Set environment variables:
+   - `REACT_APP_API_URL` = your backend URL
+   - `REACT_APP_WIREFLUID_RPC` = https://evm.wirefluid.com
+   - `REACT_APP_CONTRACT_ADDRESS` = 0x7Ddb788669d63F20abeCBF55C74604a074681523
+   - `REACT_APP_CHAIN_ID` = 92533
+
+### Backend (Render/Railway/Heroku)
+
+The backend requires:
+- Node.js server
+- MySQL database
+
+Deploy to Render.com, Railway.app, or similar.
+
+---
+
 ## 📝 License
 
 MIT
