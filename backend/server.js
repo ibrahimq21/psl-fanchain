@@ -53,8 +53,14 @@ async function initWeb3() {
     const fs = require('fs');
     const path = require('path');
     
-    // Load ABI from compiled contract
-    const artifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../build/contracts/FanChain.json'), 'utf8'));
+    // Try to load contract ABI
+    const artifactPath = path.join(__dirname, '../build/contracts/FanChain.json');
+    if (!fs.existsSync(artifactPath)) {
+      console.log('⚠️ Contract ABI not found - blockchain features disabled');
+      return;
+    }
+    
+    const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
     FAN_CHAIN_ABI = artifact.abi;
     
     const Web3 = require('web3');
