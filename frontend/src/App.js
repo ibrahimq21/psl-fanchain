@@ -13,8 +13,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
-// Backend API URL - from environment or default to deployed backend
-const BACKEND_URL = process.env.REACT_APP_API_URL || 'https://psl-fanchain.onrender.com';
+// Backend API URL - use deployed backend (no port)
+const BACKEND_URL = 'https://psl-fanchain.onrender.com';
 
 // WireFluid Config
 const WIREFLUID_RPC = process.env.REACT_APP_WIREFLUID_RPC || 'https://evm.wirefluid.com';
