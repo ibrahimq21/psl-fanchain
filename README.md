@@ -1,136 +1,127 @@
-# PSL FanChain - Anti-Spoof Location System
+# 🏏 PSL FanChain - Blockchain-Powered Fan Engagement Platform
 
-## Completed Tasks Summary
+A comprehensive Web3 platform for PSL (Pakistan Super League) fan engagement with NFT-based attendance verification, campaign management, and reward systems.
 
-### ✅ Phase 1: Node.js Backend (Geo Validation + Risk Engine)
-**Location:** `psl-fanchain/backend/`
+---
 
-**Running at:** `http://localhost:3003`
+## 🎯 Features
+
+### Core
+- ✅ **NFT Check-in** - Real blockchain transactions on WireFluid
+- ✅ **Anti-Spoof** - GPS validation, device fingerprinting, risk scoring
+- ✅ **Campaigns** - Influencer-driven campaigns with tasks
+- ✅ **Fan Score** - Points system with Bronze/Silver/Gold/VIP tiers
+- ✅ **Rewards** - Merchandise, tickets, experiences redemption
+- ✅ **Moderation** - Reports, bans, appeals system
+
+### Tech Stack
+- **Frontend:** React
+- **Backend:** Express + Node.js
+- **Blockchain:** Solidity + Truffle + WireFluid
+- **Database:** MySQL
+
+---
+
+## 📁 Project Structure
+
+```
+psl-fanchain/
+├── backend/           # Express API (port 3003)
+├── frontend/          # React app (port 3000)
+├── influencer-dashboard/  # Campaign management
+├── blockchain/        # Web3 module
+├── contracts/         # Solidity contracts
+├── build/            # Compiled artifacts
+├── shared/           # Shared utilities
+└── venues/           # Stadium data JSON
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+
+- MySQL
+- npm/yarn
+
+### Setup
+
+```bash
+# Clone & install
+git clone https://github.com/ibrahimq21/psl-fanchain.git
+cd psl-fanchain
+
+# Backend
+cd backend
+npm install
+# Configure .env with your settings
+node server.js
+
+# Frontend (new terminal)
+cd ../frontend
+npm install
+npm start
+
+# Influencer Dashboard (new terminal)
+cd ../influencer-dashboard
+npm install
+npm start
+```
+
+---
+
+## 🔌 API Endpoints
 
 | Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Server status |
+|---------|--------|-------------|
 | `/health` | GET | Health check |
-| `/stadiums` | GET | List PSL stadiums |
-| `/config` | GET | Public config |
-| `/verify` | POST | Verify check-in |
-| `/challenge` | POST | Generate challenge |
-| `/challenge/verify` | POST | Verify challenge response |
-| `/checkins` | GET | List all check-ins |
-| `/demo/generate` | POST | Generate test payload |
-| `/blockchain/status` | GET | Blockchain status |
-| `/blockchain/record` | POST | Record to blockchain |
-| `/blockchain/nfts/:wallet` | GET | Get fan's NFTs |
-| `/blockchain/rewards/:wallet` | GET | Get reward points |
-| `/blockchain/contract` | GET | Contract info |
-
-**Features:**
-- HMAC-SHA256 signature verification
-- Anti-replay protection (nonce)
-- Geo-fencing (Haversine formula)
-- Speed validation (anti-teleport)
-- Risk scoring engine
-- Challenge-response verification
+| `/verify` | POST | **Check-in + NFT mint** |
+| `/campaigns` | GET/POST | Campaign CRUD |
+| `/stadiums` | GET | Venue data |
+| `/profile/:wallet` | GET | Fan profile + tier |
+| `/rewards` | GET | Reward catalog |
+| `/admin/ban` | POST | Ban user |
+| `/admin/reports` | GET | Reports queue |
 
 ---
 
-### ✅ Phase 2: Android Anti-Spoof SDK
-**Location:** `psl-fanchain/android/`
+## ⛓️ Blockchain
 
-**File:** `src/main/java/com/psl/fanchain/AntiSpoofSdk.java`
-
-| Method | Description |
-|--------|-------------|
-| `isMockLocationEnabled()` | Check if mock GPS enabled |
-| `isLocationFromMockProvider(Location)` | Detect fake location |
-| `isEmulator()` | Detect emulator |
-| `isRooted()` | Check for root |
-| `checkSensorMismatch(Location)` | GPS vs accelerometer |
-| `getDeviceId()` | Get hashed device ID |
-| `generateSignedPayload(Location, stadiumId)` | Generate signed payload |
+| Item | Details |
+|------|---------|
+| **Network** | WireFluid Testnet |
+| **Chain ID** | 92533 |
+| **RPC** | https://evm.wirefluid.com |
+| **Contract** | `0x7Ddb788669d63F20abeCBF55C74604a074681523` |
 
 ---
 
-### ✅ Phase 3: WireFluid Blockchain Integration
-**Location:** `psl-fanchain/blockchain/`
+## 🗄️ Database
 
-| Component | Description |
-|-----------|-------------|
-| `index.js` | Full contract + service |
-| `routes.js` | Express blockchain routes |
+**MySQL Database:** `psl_fanchain`
 
-**WireFluid Details:**
-- **Network:** Cosmos-based + EVM compatible
-- **TPS:** 2,500
-- **Finality:** Sub-3 seconds
-- **Tx Fee:** $0.01
-- **Contract:** PSLFanCheckIn (ERC721)
+Tables: users, roles, permissions, reports, moderation_actions, banned_entities, risk_scores, appeals, activity_logs
 
 ---
 
-## Test Results
+## 📱 Apps
 
-```
-✅ Health Check         - healthy
-✅ Generate Payload    - lat: 31.5204, lng: 74.3587
-✅ Verify Check-in    - Token ID: c5290727-b07a-4ebd-8ab5-9fd400b10eff
-✅ Record to Blockchain - NFT #1 minted
-✅ Reward Points      - 30 points, 1 NFT
-```
+| App | URL | Description |
+|-----|-----|-------------|
+| Frontend | http://localhost:3000 | User check-in |
+| Dashboard | http://localhost:3001 | Influencer hub |
+| Backend | http://localhost:3003 | API |
 
 ---
 
-## Request Payload Example
+## 📝 License
 
-```json
-POST /verify
-{
-  "payload": {
-    "lat": 31.5204,
-    "lng": 74.3587,
-    "timestamp": 1774857000,
-    "nonce": "abc-123-uuid",
-    "stadiumId": "lahore",
-    "deviceId": "0x742d35Cc6453C60f6b1C3d2c2aE2a4f4C9d1d6",
-    "isMockLocation": false,
-    "isEmulator": false,
-    "sensorMismatch": false
-  },
-  "signature": "a9fe9a82bad43ca844749d2a215e7a49c8f38c0e254fd45d50bdf4c81dcf2aa9"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "checkIn": {
-    "id": "...",
-    "stadiumId": "lahore",
-    "stadiumName": "Gaddafi Stadium",
-    "timestamp": 1774857000000,
-    "riskScore": 20,
-    "verifiedAt": 1774857000123
-  },
-  "message": "Check-in verified successfully"
-}
-```
+MIT
 
 ---
 
-## Next Steps
+## 🔗 Links
 
-1. **Deploy contract** to WireFluid testnet
-2. **Build Android app** with AntiSpoofSdk
-3. **Add WalletConnect** for wallet linking
-4. **Integrate Play Integrity API** for device attestation
-5. **Go live** on mainnet
-
----
-
-## Stack
-
-- **Backend:** Node.js + Express
-- **Mobile:** Android (Kotlin/Java)
-- **Blockchain:** WireFluid (Cosmos + EVM)
-- **Storage:** In-memory (prod: Redis + PostgreSQL)
+- [WireFluid Explorer](https://wirefluidscan.com)
+- [Contract on Explorer](https://wirefluidscan.com/address/0x7Ddb788669d63F20abeCBF55C74604a074681523)
