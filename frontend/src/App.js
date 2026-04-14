@@ -79,7 +79,7 @@ function App() {
   const [connecting, setConnecting] = useState(false);
   const [checkIns, setCheckIns] = useState([]);
   const [nfts, setNfts] = useState([]);
-  const [rewards, setRewards] = useState(null);
+  const [rewards, setRewards] = useState({ points: 0, earnings: 0 });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('home');
@@ -180,9 +180,9 @@ function App() {
         fetch(`${BACKEND_URL}/profile/${address}`).then(r => r.json()),
         fetch(`${BACKEND_URL}/rewards/user/${address}`).then(r => r.json())
       ]);
-      setCheckIns(checkInsRes.checkIns || []);
-      setNfts(nftsRes.nfts || []);
-      setRewards(rewardsRes);
+      setCheckIns(checkInsRes?.checkIns || checkInsRes || []);
+      setNfts(nftsRes?.nfts || nftsRes || []);
+      setRewards(rewardsRes || { points: 0, earnings: 0 });
       setFanProfile(profileRes);
       setUserRedemptions(redemptionsRes.redemptions || []);
     } catch (err) {
