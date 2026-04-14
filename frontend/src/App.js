@@ -94,7 +94,7 @@ function App() {
   const [taskTypes, setTaskTypes] = useState([]);
   const [scannerActive, setScannerActive] = useState(false);
   const [scannerError, setScannerError] = useState(null);
-  scannerRef.current = useRef(null);
+  const scannerRef = useRef(null);
   const scanLockRef = useRef(false);
 
 
