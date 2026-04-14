@@ -43,7 +43,7 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
   // Use simple test function
   const tx = await contract.mintTest(
     walletAddress,
-    `https://pslfanchain.io/nft/${Date.now()}`
+    `${BACKEND_URL}/nft/${Date.now()}`
   );
   
   const receipt = await tx.wait();
@@ -507,6 +507,33 @@ function App() {
       // Step 6: Mint NFT (optional)
       setMessage('🎫 Minting NFT...');
       // ... NFT mint logic
+      // Try to mint NFT via MetaMask
+        try {
+          const txHash = await mintNFTWithMetaMask(wallet, 4, stadiumName, payload.lat, payload.lng);
+          console.log(txHash);
+          setMessage(`✅ Check-in complete at ${stadiumName}! NFT minted: ${txHash.substring(0, 10)}...`);
+          
+          // Refresh wallet data after successful mint
+          fetchWalletData(wallet);
+        } catch (mintErr) {
+          console.log('MetaMask mint failed:', mintErr.message);
+          setMessage(`✅ Check-in verified at ${stadiumName}! (NFT mint skipped)`);
+        }
+        // Add score to fan profile
+        try {
+          await fetch(`${BACKEND_URL}/profile/${wallet}/score`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              eventType: 'checkin',
+              metadata: { stadiumId: result.checkIn?.stadiumId }
+            })
+          });
+        } catch (e) {
+          console.error('Failed to add score:', e);
+        }
+        
+        fetchWalletData(wallet);
       
     } catch (e) {
       console.error('Scan error:', e);
