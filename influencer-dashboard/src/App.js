@@ -38,13 +38,14 @@ function App() {
     totalEarnings: 45000
   });
 
+  // Load data from backend
   useEffect(() => {
-    // Load data from backend
     fetchCampaigns();
     fetchStats();
     fetchVenues();
-  }, [fetchCampaigns, fetchStats, fetchVenues]);
+  }, []);
 
+  // Fetch functions
   const fetchVenues = async () => {
     try {
       const res = await fetch(`${API_URL}/stadiums`);
