@@ -428,6 +428,7 @@ function App() {
     scanLockRef.current = true;
     
     console.log('📷 QR SCANNED:', decodedText);
+    setMessage('📷 QR SCANNED:', decodedText);
     
     try {
       // Stop scanner
