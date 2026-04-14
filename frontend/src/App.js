@@ -425,6 +425,8 @@ function App() {
 
   // Process scanned QR code
   const processScan = async (decodedText) => {
+    console.log(`entered processScan ${decodedText}`);
+    
     // Debounce: prevent multiple scans
     if (scanLockRef.current) return;
     scanLockRef.current = true;
