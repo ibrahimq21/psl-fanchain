@@ -21,7 +21,7 @@ const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 
 // FanChain NFT ABI - simple test function
 const NFT_ABI = [
-  "function mintTest(address _to, string _tokenURI) external returns (uint256)",
+  "function mintTest(address _to, string calldata _tokenURI) external returns (uint256)",
   "function createCampaign(string memory _name, string memory _description, uint256 _stadiumLat, uint256 _stadiumLng, uint256 _geoRadius, uint256 _startTime, uint256 _endTime, string memory _rewardTier, uint256 _rewardPoints, address _sponsor) external returns (uint256)",
   "function getUserNFTs(address _user) external view returns (uint256[] memory)",
   "event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 indexed campaignId)"

@@ -103,7 +103,8 @@ contract FanChain is ERC721, Ownable {
     }
 
     // Simple test function - mint without signature
-    function mintTest(address _to, string memory _tokenURI) external returns (uint256) {
+    // TESTING VERSION
+    function mintTest(address _to, string calldata _tokenURI) external returns (uint256) {
         uint256 newTokenId = _tokenIds.current();
         _mint(_to, newTokenId);
         _setTokenURI(newTokenId, _tokenURI);
