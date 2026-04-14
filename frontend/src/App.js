@@ -388,6 +388,8 @@ function App() {
       
       // Start scanner with exact deviceId
       try {
+        console.log('qr code entry');
+        
         await qrCode.start(
           { deviceId: { exact: selectedDevice.deviceId } },
           { fps: 5, qrbox: 250 },
