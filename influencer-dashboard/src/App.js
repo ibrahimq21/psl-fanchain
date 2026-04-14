@@ -231,24 +231,16 @@ function App() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const generateQRCode = async (campaignId, campaign) => {
-    // First get signed payload from backend
-    try {
-      const stadiumId = campaign?.stadiumId || campaignId;
-      const result = await api.post('/generate-qr-payload', {
-        campaignId,
-        stadiumId
-      });
-      
-      if (result.success) {
-        return `${QR_API_URL}?size=200x200&data=${encodeURIComponent(result.qrData)}`;
-      }
-    } catch (err) {
-      console.log('Using fallback QR');
-    }
-    
-    // Fallback: simple QR with campaignId
+  const generateQRCode = (campaignId) => {
+    // Simple fallback QR with campaignId
     return `${QR_API_URL}?size=200x200&data=${campaignId}`;
+  };
+  
+  // Generate signed QR on demand
+  const handleGenerateSignedQR = async (campaign) => {
+    const qrUrl = await generateQRCode(campaign.id, campaign);
+    // Open in new tab or show modal
+    window.open(qrUrl, '_blank');
   };
 
   const getStadiumName = (id) => venues.find(s => s.id === id)?.name || id;
@@ -390,6 +382,7 @@ function App() {
                   </div>
 
                   <div className="campaign-actions">
+                    <button className="btn-small" onClick={() => handleGenerateSignedQR(c)}>📱 Generate QR</button>
                     <button className="btn-small">📊 Analytics</button>
                     <button className="btn-small">📤 Share</button>
                   </div>
