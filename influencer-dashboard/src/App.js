@@ -39,6 +39,7 @@ function App() {
   });
 
   // Load data from backend
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchCampaigns();
     fetchStats();
