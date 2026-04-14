@@ -4,20 +4,24 @@
  * This module loads venues from venues.json and provides
  * a consistent interface for all services.
  * 
- * Usage:
- *   const { getVenues, getVenueById, getStadiumOptions } = require('./shared/venues');
+ * Usage (ESM):
+ *   import { getVenues, getVenueById, getStadiumOptions } from './shared/venues.js';
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load venues from JSON
 const venuesPath = path.join(__dirname, '..', 'venues', 'venues.json');
 let venues = {};
 
 try {
-  const venuesData = JSON.parse(fs.readFileSync(venuesPath, 'utf8'));
-  venues = venuesData;
+  const venuesData = fs.readFileSync(venuesPath, 'utf8');
+  venues = JSON.parse(venuesData);
 } catch (err) {
   console.error('Failed to load venues.json:', err.message);
 }
@@ -46,7 +50,7 @@ function getVenueByKey(key) {
  */
 function getVenuesByCity(city) {
   return Object.entries(venues)
-    .filter(([_, v]) => v.city.toLowerCase() === city.toLowerCase())
+    .filter(([, v]) => v.city?.toLowerCase() === city.toLowerCase())
     .map(([key, v]) => ({ id: key, ...v }));
 }
 
@@ -56,7 +60,7 @@ function getVenuesByCity(city) {
  */
 function getStadiums() {
   return Object.entries(venues)
-    .filter(([_, v]) => !v.isEvent)
+    .filter(([, v]) => !v.isEvent)
     .map(([key, v]) => ({ id: key, ...v }));
 }
 
@@ -66,7 +70,7 @@ function getStadiums() {
  */
 function getEvents() {
   return Object.entries(venues)
-    .filter(([[key, v]]) => v.isEvent)
+    .filter(([, v]) => v.isEvent)
     .map(([key, v]) => ({ id: key, ...v }));
 }
 
@@ -107,11 +111,11 @@ function isValidVenue(key) {
  */
 function getCoordinates(key) {
   const venue = venues[key];
-  if (!venue || !venue.coordinates) return null;
-  return venue.coordinates;
+  if (!venue) return null;
+  return { lat: venue.lat, lng: venue.lng };
 }
 
-module.exports = {
+export default {
   venues,
   getVenues,
   getVenueByKey,

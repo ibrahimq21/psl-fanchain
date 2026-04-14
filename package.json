@@ -1,5 +1,4 @@
 {
-  "type": "module",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.2",
     "@truffle/hdwallet-provider": "^2.1.15",
