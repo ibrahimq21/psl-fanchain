@@ -100,7 +100,11 @@ function App() {
   // Fetch functions using centralized API
   const fetchVenues = async () => {
     try {
-      const data = await api.get('/stadiums');
+      const data = await api.get('/stadiums').catch(() => ({}));
+      if (!data || Object.keys(data).length === 0) {
+        console.log('Using default venues');
+        return;
+      }
       const venueOptions = Object.entries(data).map(([key, v]) => ({
         id: key,
         name: v.name || key,
@@ -120,7 +124,7 @@ function App() {
 
   const fetchCampaigns = async () => {
     try {
-      const data = await api.get('/campaigns');
+      const data = await api.get('/campaigns').catch(() => ({ campaigns: [] }));
       setCampaigns(data.campaigns || []);
     } catch (err) {
       console.error('Failed to fetch campaigns:', err);
@@ -131,11 +135,23 @@ function App() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const data = await api.get('/influencer/stats');
-      setStats(data);
+      // Try different endpoints
+      const data = await api.get('/admin/stats').catch(() => 
+        api.get('/campaigns').catch(() => null)
+      );
+      
+      if (data) {
+        setStats({
+          totalCampaigns: data.campaigns?.length || campaigns.length || 0,
+          totalParticipants: data.totalCheckIns || 0,
+          totalRewards: data.totalPoints || 0
+        });
+      } else {
+        setStats({ totalCampaigns: campaigns.length, totalParticipants: 0, totalRewards: 0 });
+      }
     } catch (err) {
       console.error('Failed to fetch stats:', err);
-      setStats({ totalCampaigns: campaigns.length, totalCheckIns: 0, totalEarnings: 0 });
+      setStats({ totalCampaigns: campaigns.length, totalParticipants: 0, totalRewards: 0 });
     } finally {
       setLoading(false);
     }
