@@ -4,24 +4,38 @@
  * This module loads venues from venues.json and provides
  * a consistent interface for all services.
  * 
- * Usage (ESM):
- *   import { getVenues, getVenueById, getStadiumOptions } from './shared/venues.js';
+ * Usage:
+ *   const { getVenues, getVenueByKey, getStadiumOptions } = require('./shared/venues');
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const fs = require('fs');
+const path = require('path');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load venues from JSON
-const venuesPath = path.join(__dirname, '..', 'venues', 'venues.json');
+// Load venues from JSON - use process.cwd() for Render
 let venues = {};
 
 try {
-  const venuesData = fs.readFileSync(venuesPath, 'utf8');
-  venues = JSON.parse(venuesData);
+  // Try multiple locations for venues.json
+  const possiblePaths = [
+    path.join(process.cwd(), 'venues', 'venues.json'),
+    path.join(process.cwd(), '..', 'venues', 'venues.json'),
+    path.join(__dirname, 'venues', 'venues.json'),
+  ];
+  
+  let venuesPath = '';
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      venuesPath = p;
+      break;
+    }
+  }
+  
+  if (venuesPath) {
+    const venuesData = JSON.parse(fs.readFileSync(venuesPath, 'utf8'));
+    venues = venuesData;
+  } else {
+    console.error('venues.json not found in any location');
+  }
 } catch (err) {
   console.error('Failed to load venues.json:', err.message);
 }
@@ -50,7 +64,7 @@ function getVenueByKey(key) {
  */
 function getVenuesByCity(city) {
   return Object.entries(venues)
-    .filter(([, v]) => v.city?.toLowerCase() === city.toLowerCase())
+    .filter(([, v]) => v.city && v.city.toLowerCase() === city.toLowerCase())
     .map(([key, v]) => ({ id: key, ...v }));
 }
 
@@ -115,7 +129,7 @@ function getCoordinates(key) {
   return { lat: venue.lat, lng: venue.lng };
 }
 
-export default {
+module.exports = {
   venues,
   getVenues,
   getVenueByKey,
