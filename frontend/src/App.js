@@ -401,6 +401,7 @@ function App() {
         },
         (errorMessage) => {
           // Ignore scan errors silently
+          console.log(errorMessage);
         }
       );
       
