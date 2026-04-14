@@ -65,17 +65,31 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
   
   const contract = new ethers.Contract(proofData.contractAddress, NFT_ABI, signer);
   
-  const tx = await contract.mintWithSignature(
-    proofData.proof.user,
-    proofData.proof.campaignId.toString(),
-    proofData.proof.lat.toString(),
-    proofData.proof.lng.toString(),
-    proofData.proof.timestamp.toString(),
-    proofData.proof.nonce,
-    proofData.proof.expiry.toString(),
-    proofData.signature,
-    `https://pslfanchain.io/nft/${Date.now()}`
+  // Get function selector properly
+  const iface = new ethers.Interface(NFT_ABI);
+  const funcSelector = iface.getFunction("mintWithSignature").selector;
+  
+  // Encode parameters manually
+  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+  const encodedParams = abiCoder.encode(
+    ["address", "uint256", "uint256", "uint256", "uint256", "bytes32", "uint256", "bytes", "string"],
+    [
+      proofData.proof.user,
+      proofData.proof.campaignId,
+      proofData.proof.lat,
+      proofData.proof.lng,
+      proofData.proof.timestamp,
+      ethers.keccak256(ethers.toUtf8Bytes(proofData.proof.nonce)),
+      proofData.proof.expiry,
+      proofData.signature,
+      `https://pslfanchain.io/nft/${Date.now()}`
+    ]
   );
+  
+  const tx = await signer.sendTransaction({
+    to: proofData.contractAddress,
+    data: funcSelector + encodedParams.slice(2)
+  });
   
   const receipt = await tx.wait();
   return receipt.hash;
