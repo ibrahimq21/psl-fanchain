@@ -387,59 +387,6 @@ function App() {
         }
       }
       
-      setMessage('Point camera at QR code');
-        async (decodedText) => {
-          // IMMEDIATE LOG - always runs
-          console.log('📷 QR SCANNED:', decodedText);
-          
-          // Debounce: prevent multiple scans
-          if (scanLockRef.current) return;
-          scanLockRef.current = true;
-          
-          try {
-            // Stop scanner immediately
-            await qrCode.stop();
-            setScannerActive(false);
-            
-            // Log the raw scanned text
-            console.log('Raw scanned text:', decodedText);
-            
-            // Try to parse as JSON first
-            let payload = null;
-            try {
-              payload = JSON.parse(decodedText);
-              console.log('Parsed JSON payload:', payload);
-            } catch (e) {
-              console.log('Not JSON, treating as plain string');
-            }
-            
-            // Plain string - use directly
-            const ticketId = decodedText.trim();
-            setScanResult(ticketId);
-            setMessage(`Scanned: ${ticketId}`);
-            
-            // Try to match with venues/campaigns
-            const stadium = venues.find(s => 
-              s.id === ticketId || 
-              s.name.toLowerCase().includes(ticketId.toLowerCase())
-            );
-            
-            if (stadium) {
-              setSelectedStadium(stadium);
-              setMessage(`Found stadium: ${stadium.name}`);
-            }
-          } catch (e) {
-            console.error('Scan processing error:', e);
-          } finally {
-            // Release lock after delay
-            setTimeout(() => { scanLockRef.current = false; }, 2500);
-          }
-        },
-        (errorMessage) => {
-          // Ignore scan errors silently - they're normal when no QR in view
-        }
-      
-    
       setMessage('Point camera at QR code - make sure QR is well-lit and centered');
     } catch (err) {
       setScannerError(err.message);
