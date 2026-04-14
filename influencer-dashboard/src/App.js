@@ -135,7 +135,6 @@ function App() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      // Try different endpoints
       const data = await api.get('/admin/stats').catch(() => 
         api.get('/campaigns').catch(() => null)
       );
@@ -152,6 +151,33 @@ function App() {
     } catch (err) {
       console.error('Failed to fetch stats:', err);
       setStats({ totalCampaigns: campaigns.length, totalParticipants: 0, totalRewards: 0 });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate QR code for campaign
+  const generateCampaignQR = async (campaign) => {
+    try {
+      setLoading(true);
+      const stadiumId = campaign.stadiumId || campaign.stadiumId;
+      const result = await api.post('/generate-qr-payload', {
+        campaignId: campaign.id,
+        stadiumId: stadiumId
+      });
+      
+      if (result.success) {
+        // Generate QR image URL
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(result.qrData)}`;
+        setNotification({
+          type: 'success',
+          message: `QR Generated! Campaign: ${campaign.name}`
+        });
+        return { qrUrl, qrData: result.qrData, campaign };
+      }
+    } catch (err) {
+      console.error('QR generation failed:', err);
+      setNotification({ type: 'error', message: 'Failed to generate QR' });
     } finally {
       setLoading(false);
     }
@@ -205,8 +231,23 @@ function App() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const generateQRCode = (campaignId) => {
-    // Return a QR code URL using environment variable or fallback
+  const generateQRCode = async (campaignId, campaign) => {
+    // First get signed payload from backend
+    try {
+      const stadiumId = campaign?.stadiumId || campaignId;
+      const result = await api.post('/generate-qr-payload', {
+        campaignId,
+        stadiumId
+      });
+      
+      if (result.success) {
+        return `${QR_API_URL}?size=200x200&data=${encodeURIComponent(result.qrData)}`;
+      }
+    } catch (err) {
+      console.log('Using fallback QR');
+    }
+    
+    // Fallback: simple QR with campaignId
     return `${QR_API_URL}?size=200x200&data=${campaignId}`;
   };
 

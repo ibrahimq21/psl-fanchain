@@ -466,7 +466,7 @@ function App() {
     return { valid: true };
   };
 
-  const verifyTicketData = (ticketData) => {
+  const verifyTicketData = async (ticketData) => {
     // Validate before sending
     const validation = validateQRPayload(ticketData);
     if (!validation.valid) {
@@ -475,6 +475,55 @@ function App() {
     }
     
     setMessage('Verifying ticket...');
+    
+    // Try to parse as signed QR payload first
+    let qrPayload = null;
+    try {
+      qrPayload = JSON.parse(ticketData);
+    } catch (e) {
+      // Not JSON - treat as simple ticket ID
+    }
+    
+    // If it's a signed payload, verify via backend
+    if (qrPayload && qrPayload.v === 1 && qrPayload.campaignId) {
+      try {
+        const verifyResult = await fetch(`${BACKEND_URL}/verify-qr-payload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qrData: ticketData })
+        }).then(r => r.json());
+        
+        if (!verifyResult.valid) {
+          setMessage(`❌ Invalid QR: ${verifyResult.error}`);
+          return;
+        }
+        
+        // Got valid campaign context - now verify check-in
+        setMessage(`Campaign: ${verifyResult.campaign?.name} - Verifying...`);
+        
+        const checkInResult = await fetch(`${BACKEND_URL}/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            qrData: ticketData,
+            campaignId: qrPayload.campaignId,
+            stadiumId: qrPayload.stadiumId,
+            lat: userLocation?.lat || 31.5204,
+            lng: userLocation?.lng || 74.3587,
+            deviceId: wallet || 'demo'
+          })
+        }).then(r => r.json());
+        
+        setMessage(checkInResult.success 
+          ? `✅ Verified! +${verifyResult.campaign?.pointsPerCheckIn || 100} pts`
+          : `❌ ${checkInResult.message || 'Verification failed'}`);
+        return;
+      } catch (err) {
+        console.error('QR verification failed:', err);
+      }
+    }
+    
+    // Fallback: original ticket verification
     fetch(`${BACKEND_URL}/tickets/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

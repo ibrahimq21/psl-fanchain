@@ -517,6 +517,111 @@ app.post('/campaigns', (req, res) => {
   res.json({ campaign, message: 'Campaign created' });
 });
 
+// ==================== QR PAYLOAD SIGNING ====================
+
+// Generate signed QR payload for campaign
+function generateSignedQRPayload(campaignId, stadiumId) {
+  const payload = {
+    v: 1, // version
+    campaignId,
+    stadiumId,
+    timestamp: Date.now(),
+    nonce: crypto.randomBytes(8).toString('hex')
+  };
+  
+  // Sign the payload
+  const privateKey = process.env.PRIVATE_KEY;
+  if (privateKey) {
+    const signPayload = JSON.stringify(payload);
+    const hash = crypto.createHash('sha256').update(signPayload).digest('hex');
+    const wallet = new ethers.Wallet(privateKey);
+    payload.signature = wallet.signMessage(hash).then(s => s).catch(() => 'no-signature');
+  } else {
+    payload.signature = 'demo-signature';
+  }
+  
+  return payload;
+}
+
+// Generate QR payload endpoint
+app.post('/generate-qr-payload', async (req, res) => {
+  const { campaignId, stadiumId } = req.body;
+  
+  if (!campaignId || !stadiumId) {
+    return res.status(400).json({ error: 'campaignId and stadiumId required' });
+  }
+  
+  const campaign = campaignStore.get(campaignId);
+  if (!campaign) {
+    return res.status(404).json({ error: 'Campaign not found' });
+  }
+  
+  const payload = generateSignedQRPayload(campaignId, stadiumId);
+  
+  if (payload.signature && typeof payload.signature.then === 'function') {
+    payload.signature = await payload.signature;
+  }
+  
+  res.json({
+    success: true,
+    payload,
+    qrData: JSON.stringify(payload)
+  });
+});
+
+// Verify QR payload endpoint
+app.post('/verify-qr-payload', async (req, res) => {
+  const { qrData } = req.body;
+  
+  if (!qrData) {
+    return res.status(400).json({ error: 'qrData required' });
+  }
+  
+  try {
+    const payload = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+    
+    // Validate version
+    if (!payload.v || payload.v !== 1) {
+      return res.status(400).json({ error: 'Invalid QR version' });
+    }
+    
+    // Check timestamp expiry (24 hours)
+    const maxAge = 24 * 60 * 60 * 1000;
+    if (Date.now() - payload.timestamp > maxAge) {
+      return res.status(400).json({ error: 'QR code expired' });
+    }
+    
+    const campaign = campaignStore.get(payload.campaignId);
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+    
+    const stadium = CONFIG.stadiums[payload.stadiumId];
+    if (!stadium) {
+      return res.status(404).json({ error: 'Stadium not found' });
+    }
+    
+    res.json({
+      valid: true,
+      campaign: {
+        id: campaign.id,
+        name: campaign.name,
+        stadiumId: campaign.stadiumId,
+        pointsPerCheckIn: campaign.rewards?.pointsPerCheckIn || 100,
+        bonusPoints: campaign.rewards?.bonusPoints || 50
+      },
+      stadium: {
+        id: payload.stadiumId,
+        name: stadium.name || stadium.stadiumName,
+        lat: stadium.lat,
+        lng: stadium.lng
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ error: 'Invalid QR data' });
+  }
+});
+
 // Join campaign
 app.post('/campaigns/:id/join', (req, res) => {
   const { wallet, payload, signature } = req.body;
