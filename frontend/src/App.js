@@ -438,8 +438,8 @@ function App() {
         (errorMessage) => {
           // Ignore scan errors silently - they're normal when no QR in view
         }
-      );
       
+    
       setMessage('Point camera at QR code - make sure QR is well-lit and centered');
     } catch (err) {
       setScannerError(err.message);
@@ -1051,5 +1051,4 @@ function App() {
   );
 }
 
-export default App;t e s t 
- 
+export default App;
