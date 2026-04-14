@@ -431,41 +431,6 @@ function App() {
       console.error('Scanner start error:', err);
     }
   };
-              return;
-            }
-            
-            setScanResult(decodedText);
-            setMessage(`Scanned: ${decodedText}`);
-            
-            const stadium = venues.find(s => 
-              s.id === decodedText || 
-              s.name.toLowerCase().includes(decodedText.toLowerCase())
-            );
-            
-            if (stadium) {
-              setSelectedStadium(stadium);
-              setMessage(`Found: ${stadium.name}`);
-            }
-          } catch (e) {
-            console.error('Scan processing error:', e);
-          } finally {
-            // Release lock after delay
-            setTimeout(() => { scanLockRef.current = false; }, 2000);
-          }
-        },
-        (errorMessage) => {
-          // Ignore scan errors silently
-          console.log(errorMessage);
-        }
-      );
-      
-      setMessage('Point camera at QR code');
-    } catch (err) {
-      setScannerError(err.message);
-      setMessage('Camera error: ' + err.message);
-      console.error('Scanner error:', err);
-    }
-  };
 
   const stopScanner = async () => {
     try {
