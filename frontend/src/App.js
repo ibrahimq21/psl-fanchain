@@ -364,9 +364,15 @@ function App() {
       const qrCode = new Html5Qrcode('qr-reader');
       scannerRef.current = qrCode;
       
-      // Enumerate devices and find optimal camera
+      // Request camera permission to unlock device labels
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      
+      // Now enumerate devices with labels unlocked
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      
+      // Stop the temporary stream
+      stream.getTracks().forEach(t => t.stop());
       
       if (videoDevices.length === 0) {
         throw new Error('No camera found');
