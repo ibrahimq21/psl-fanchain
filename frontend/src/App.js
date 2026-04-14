@@ -364,13 +364,30 @@ function App() {
       const qrCode = new Html5Qrcode('qr-reader');
       scannerRef.current = qrCode;
       
-      // Start scanner with simpler config
-      await qrCode.start(
-        'environment',
-        { 
-          fps: 5,
-          qrbox: 250
-        },
+      // Start scanner - try back camera first
+      try {
+        await qrCode.start(
+          'environment',
+          { fps: 5, qrbox: 250 },
+          (decodedText) => processScan(decodedText),
+          () => {}
+        );
+      } catch (err) {
+        // Try front camera if back fails
+        console.log('Back camera failed, trying front:', err.message);
+        try {
+          await qrCode.start(
+            'user',
+            { fps: 5, qrbox: 250 },
+            (decodedText) => processScan(decodedText),
+            () => {}
+          );
+        } catch (err2) {
+          throw new Error('No camera available: ' + err2.message);
+        }
+      }
+      
+      setMessage('Point camera at QR code');
         async (decodedText) => {
           // IMMEDIATE LOG - always runs
           console.log('📷 QR SCANNED:', decodedText);
@@ -428,6 +445,42 @@ function App() {
       setScannerError(err.message);
       setMessage('Camera error: ' + err.message);
       console.error('Scanner start error:', err);
+    }
+  };
+
+  // Process scanned QR code
+  const processScan = async (decodedText) => {
+    // Debounce: prevent multiple scans
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
+    
+    console.log('📷 QR SCANNED:', decodedText);
+    
+    try {
+      // Stop scanner
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
+        setScannerActive(false);
+      }
+      
+      const ticketId = decodedText.trim();
+      setScanResult(ticketId);
+      setMessage(`Scanned: ${ticketId}`);
+      
+      // Try to match with venues/campaigns
+      const stadium = venues.find(s => 
+        s.id === ticketId || 
+        s.name.toLowerCase().includes(ticketId.toLowerCase())
+      );
+      
+      if (stadium) {
+        setSelectedStadium(stadium);
+        setMessage(`Found: ${stadium.name}`);
+      }
+    } catch (e) {
+      console.error('Scan error:', e);
+    } finally {
+      setTimeout(() => { scanLockRef.current = false; }, 2500);
     }
   };
 
