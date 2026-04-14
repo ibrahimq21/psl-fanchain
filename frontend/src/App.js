@@ -45,6 +45,7 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
   });
   
   const proofData = await proofResponse.json();
+  console.log(proofData);
   if (!proofData.success) {
     throw new Error(proofData.error || 'Failed to generate proof');
   }
@@ -309,6 +310,7 @@ function App() {
         // Try to mint NFT via MetaMask
         try {
           const txHash = await mintNFTWithMetaMask(wallet, 4, stadiumName, payload.lat, payload.lng);
+          console.log(txHash);
           setMessage(`✅ Check-in complete at ${stadiumName}! NFT minted: ${txHash.substring(0, 10)}...`);
         } catch (mintErr) {
           console.log('MetaMask mint failed:', mintErr.message);
