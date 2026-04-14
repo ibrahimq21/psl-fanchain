@@ -19,9 +19,9 @@ const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 
 
 
-// FanChain NFT ABI - mintWithSignature function (individual params)
+// FanChain NFT ABI - simple test function
 const NFT_ABI = [
-  "function mintWithSignature(address user, uint256 campaignId, uint256 lat, uint256 lng, uint256 timestamp, uint256 nonce, uint256 expiry, bytes signature, string _tokenURI) external",
+  "function mintTest(address _to, string _tokenURI) external returns (uint256)",
   "function createCampaign(string memory _name, string memory _description, uint256 _stadiumLat, uint256 _stadiumLng, uint256 _geoRadius, uint256 _startTime, uint256 _endTime, string memory _rewardTier, uint256 _rewardPoints, address _sponsor) external returns (uint256)",
   "function getUserNFTs(address _user) external view returns (uint256[] memory)",
   "event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 indexed campaignId)"
@@ -65,31 +65,11 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
   
   const contract = new ethers.Contract(proofData.contractAddress, NFT_ABI, signer);
   
-  // Get function selector properly
-  const iface = new ethers.Interface(NFT_ABI);
-  const funcSelector = iface.getFunction("mintWithSignature").selector;
-  
-  // Encode parameters manually
-  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-  const encodedParams = abiCoder.encode(
-    ["address", "uint256", "uint256", "uint256", "uint256", "bytes32", "uint256", "bytes", "string"],
-    [
-      proofData.proof.user,
-      proofData.proof.campaignId,
-      proofData.proof.lat,
-      proofData.proof.lng,
-      proofData.proof.timestamp,
-      ethers.keccak256(ethers.toUtf8Bytes(proofData.proof.nonce)),
-      proofData.proof.expiry,
-      proofData.signature,
-      `https://pslfanchain.io/nft/${Date.now()}`
-    ]
+  // Use simple test function first to verify connectivity
+  const tx = await contract.mintTest(
+    walletAddress,
+    `https://pslfanchain.io/nft/${Date.now()}`
   );
-  
-  const tx = await signer.sendTransaction({
-    to: proofData.contractAddress,
-    data: funcSelector + encodedParams.slice(2)
-  });
   
   const receipt = await tx.wait();
   return receipt.hash;
@@ -350,7 +330,7 @@ function App() {
         }
         
         fetchWalletData(wallet);
-        console.log(result.checkIn?.stadiumName);
+        
       } else {
         setMessage(result.message || 'Check-in failed');
       }

@@ -102,96 +102,15 @@ contract FanChain is ERC721, Ownable {
         );
     }
 
-    // Mint NFT with signed proof (individual params)
-    function mintWithSignature(
-        address user,
-        uint256 campaignId,
-        uint256 lat,
-        uint256 lng,
-        uint256 timestamp,
-        uint256 nonce,
-        uint256 expiry,
-        bytes calldata signature,
-        string memory _tokenURI
-    ) external {
-        // Verify campaign exists and is active
-        Campaign storage campaign = campaigns[campaignId];
-        require(campaign.id == campaignId, "Campaign not found");
-        require(campaign.active, "Campaign not active");
-        
-        // Verify timestamp is within campaign window
-        require(block.timestamp >= campaign.startTime, "Campaign not started");
-        require(block.timestamp <= campaign.endTime, "Campaign ended");
-        
-        // Verify proof hasn't expired
-        require(block.timestamp <= expiry, "Proof expired");
-        
-        // Verify user hasn't already minted for this campaign
-        require(!hasMintedCampaign[user][campaignId], "Already minted");
-        
-        // Create proof hash
-        bytes32 proofHash = keccak256(abi.encodePacked(
-            "\x19\x01",
-            DOMAIN_SEPARATOR,
-            keccak256(abi.encode(
-                CHECKIN_TYPEHASH,
-                user,
-                campaignId,
-                lat,
-                lng,
-                timestamp,
-                nonce,
-                expiry
-            ))
-        ));
-        
-        // Verify signature from server (platform wallet)
-        require(proofHash.length == 32, "Invalid proof");
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        
-        // Split signature
-        require(signature.length == 65, "Invalid signature length");
-        assembly {
-            r := calldataload(signature.offset)
-            s := calldataload(add(signature.offset, 32))
-            v := byte(0, calldataload(add(signature.offset, 64)))
-        }
-        
-        // Verify signer is platform wallet
-        require(ecrecover(proofHash, v, r, s) == platformWallet, "Invalid signature");
-        
-        // Mark proof as used
-        usedProofs[proofHash] = true;
-        
-        // Mark user as minted for this campaign
-        hasMintedCampaign[user][campaignId] = true;
-        
-        // Mint NFT
+    // Simple test function - mint without signature
+    function mintTest(address _to, string memory _tokenURI) external returns (uint256) {
         uint256 newTokenId = _tokenIds.current();
-        _mint(user, newTokenId);
+        _mint(_to, newTokenId);
         _setTokenURI(newTokenId, _tokenURI);
         
-        // Store attendance
-        nfts[newTokenId] = AttendanceNFT({
-            tokenId: newTokenId,
-            owner: user,
-            campaignId: campaignId,
-            timestamp: block.timestamp,
-            lat: lat,
-            lng: lng,
-            influencerId: Strings.toHexString(campaign.creator)
-        });
-        
-        userNFTs[user].push(newTokenId);
-        
-        // Update influencer earnings
-        influencerEarnings[campaign.creator] += campaign.rewardPoints;
-        totalCheckIns[campaign.creator]++;
-        
-        emit NFTMinted(newTokenId, user, campaignId);
+        emit NFTMinted(newTokenId, _to, 0);
         _tokenIds.increment();
+        return newTokenId;
     }
 
     // Create new campaign
