@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
@@ -39,7 +40,6 @@ function App() {
   });
 
   // Load data from backend
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchCampaigns();
     fetchStats();
