@@ -6,6 +6,56 @@ import './App.css';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 const QR_API_URL = process.env.REACT_APP_QR_API_URL || 'https://api.qrserver.com/v1/create-qr-code/';
 
+// ==================== Centralized API Wrapper ====================
+
+// Toast notification helper
+const showToast = (message, type = 'error') => {
+  console.log(`[${type.toUpperCase()}] ${message}`);
+  // You can integrate a toast library here
+};
+
+// Fetch with retry and error handling
+const fetchWithRetry = async (url, options = {}, retries = 3, delay = 1000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+      
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`Fetch attempt ${attempt}/${retries} failed:`, error.message);
+      
+      if (attempt === retries) {
+        showToast(`Failed to fetch: ${error.message}`);
+        throw error;
+      }
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+  throw new Error('Max retries exceeded');
+};
+
+// Convenience wrappers
+const api = {
+  get: (endpoint) => fetchWithRetry(`${API_URL}${endpoint}`),
+  post: (endpoint, body) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'POST', body: JSON.stringify(body) }),
+  put: (endpoint, body) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (endpoint) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'DELETE' }),
+};
+
 // PSL Stadiums - loaded from backend API or use defaults
 // The actual venue list comes from the backend /stadiums endpoint
 
@@ -46,12 +96,10 @@ function App() {
     fetchVenues();
   }, []);
 
-  // Fetch functions
+  // Fetch functions using centralized API
   const fetchVenues = async () => {
     try {
-      const res = await fetch(`${API_URL}/stadiums`);
-      const data = await res.json();
-      // Transform to dropdown options
+      const data = await api.get('/stadiums');
       const venueOptions = Object.entries(data).map(([key, v]) => ({
         id: key,
         name: v.name || key,
@@ -61,7 +109,6 @@ function App() {
         isEvent: v.isEvent || false
       }));
       setVenues(venueOptions);
-      // Set default stadium
       if (venueOptions.length > 0 && !newCampaign.stadiumId) {
         setNewCampaign(prev => ({ ...prev, stadiumId: venueOptions[0].id }));
       }
@@ -72,41 +119,24 @@ function App() {
 
   const fetchCampaigns = async () => {
     try {
-      const res = await fetch(`${API_URL}/campaigns`);
-      const data = await res.json();
+      const data = await api.get('/campaigns');
       setCampaigns(data.campaigns || []);
     } catch (err) {
       console.error('Failed to fetch campaigns:', err);
-      // Use demo data
-      setCampaigns([
-        {
-          id: 'demo_1',
-          name: 'PSL 2026 - Lahore Match',
-          stadiumId: 'Gaddafi Stadium',
-          status: 'active',
-          currentParticipants: 234,
-          maxParticipants: 500,
-          rewards: { pointsPerCheckIn: 100, bonusPoints: 50 }
-        }
-      ]);
+      setCampaigns([]);
     }
   };
 
   const fetchStats = async () => {
     try {
-      const res = await fetch(`${API_URL}/analytics`);
-      const data = await res.json();
-      setStats({
-        totalCampaigns: data.campaigns?.length || 0,
-        totalParticipants: data.totalCheckIns || 0,
-        totalRewards: data.totalPoints || 0
-      });
+      setLoading(true);
+      const data = await api.get('/influencer/stats');
+      setStats(data);
     } catch (err) {
-      setStats({
-        totalCampaigns: campaigns.length,
-        totalParticipants: campaigns.reduce((sum, c) => sum + (c.currentParticipants || 0), 0),
-        totalRewards: campaigns.length * 1000
-      });
+      console.error('Failed to fetch stats:', err);
+      setStats({ totalCampaigns: campaigns.length, totalCheckIns: 0, totalEarnings: 0 });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -131,17 +161,7 @@ function App() {
     };
 
     try {
-      const res = await fetch(`${API_URL}/campaigns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(campaign)
-      });
-      
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      
-      const data = await res.json();
+      const data = await api.post('/campaigns', campaign);
       
       // Success!
       setNotification({ 
