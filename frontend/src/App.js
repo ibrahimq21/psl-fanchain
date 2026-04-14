@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+/* global BigInt */
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { Html5Qrcode } from 'html5-qrcode';
