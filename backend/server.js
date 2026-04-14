@@ -859,6 +859,104 @@ app.post('/verify', async (req, res) => {
   });
 });
 
+// ==================== EIP-712 SIGNED MINTING ====================
+
+// EIP-712 domain separator (must match contract)
+const EIP712_DOMAIN = {
+  name: "PSL FanChain",
+  version: "1",
+  chainId: parseInt(process.env.WIREFLUID_CHAIN_ID) || 92533,
+};
+
+// CheckInProof type hash (must match contract)
+const CHECKIN_TYPEHASH = "0x" + Buffer.from(
+  "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce)"
+).toString("hex");
+
+// Generate EIP-712 signature for check-in proof
+function signCheckInProof(proofData) {
+  const privateKey = process.env.PLATFORM_PRIVATE_KEY || process.env.PRIVATE_KEY;
+  if (!privateKey) {
+    throw new Error('PLATFORM_PRIVATE_KEY not configured');
+  }
+  
+  // Create domain separator hash
+  const domainHash = ethers.id(
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ["bytes32", "bytes32", "bytes32", "uint256", "address"],
+      [
+        ethers.id("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+        ethers.id(EIP712_DOMAIN.name),
+        ethers.id(EIP712_DOMAIN.version),
+        EIP712_DOMAIN.chainId,
+        process.env.NFT_CONTRACT_ADDRESS || '0x35f385e2Fd110fc069fc6f643EC9ecb887FAD06a'
+      ]
+    )
+  );
+  
+  // Create proof struct hash
+  const proofHash = ethers.id(
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ["bytes32", "address", "uint256", "uint256", "uint256", "uint256", "uint256"],
+      [
+        CHECKIN_TYPEHASH,
+        proofData.user,
+        proofData.campaignId,
+        proofData.lat,
+        proofData.lng,
+        proofData.timestamp,
+        proofData.nonce
+      ]
+    )
+  );
+  
+  // Create signed message hash
+  const signedMessageHash = ethers.id(
+    ethers.solidityPacked(
+      ["bytes1", "bytes32", "bytes32"],
+      ["0x19", "0x01", ethers.keccak256(ethers.concat([domainHash, proofHash]))]
+    )
+  );
+  
+  // Sign the message
+  const wallet = new ethers.Wallet(privateKey);
+  const signature = wallet.signMessage(ethers.getBytes(signedMessageHash));
+  
+  return signature;
+}
+
+// Generate signed proof endpoint
+app.post('/generate-proof', async (req, res) => {
+  const { user, campaignId, lat, lng, stadiumId } = req.body;
+  
+  if (!user || !campaignId) {
+    return res.status(400).json({ error: 'user and campaignId required' });
+  }
+  
+  try {
+    const proofData = {
+      user,
+      campaignId: parseInt(campaignId),
+      lat: Math.floor(lat * 1000000),  // Convert to contract format
+      lng: Math.floor(lng * 1000000),
+      timestamp: Math.floor(Date.now() / 1000),
+      nonce: crypto.randomBytes(16).toString('hex')
+    };
+    
+    const signature = signCheckInProof(proofData);
+    
+    res.json({
+      success: true,
+      proof: proofData,
+      signature,
+      contractAddress: process.env.NFT_CONTRACT_ADDRESS || '0x35f385e2Fd110fc069fc6f643EC9ecb887FAD06a'
+    });
+  } catch (err) {
+    console.error('Generate proof error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/demo/generate', (req, res) => {
   res.json({
     payload: {

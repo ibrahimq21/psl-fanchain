@@ -25,30 +25,54 @@ const CHAIN_ID = parseInt(process.env.REACT_APP_CHAIN_ID) || 92533;
 const NFT_ADDRESS = process.env.REACT_APP_NFT_ADDRESS || '0x7Ddb788669d63F20abeCBF55C74604a074681523';
 const TOKEN_ADDRESS = process.env.REACT_APP_TOKEN_ADDRESS || '0x401ACD559883227Ad8A5902bC0dE231f71525316';
 
-// FanChain NFT ABI - mintAttendanceNFT function
+// FanChain NFT ABI - mintWithSignature function (EIP-712 signed minting)
 const NFT_ABI = [
-  "function mintAttendanceNFT(address _to, uint256 _campaignId, string memory _tokenURI, uint256 _lat, uint256 _lng, string memory _influencerId) external",
+  "function mintWithSignature((address user, uint256 campaignId, uint256 lat, uint256 lng, uint256 timestamp, uint256 nonce) calldata proof, bytes calldata signature, string memory _tokenURI) external",
   "function createCampaign(string memory _name, string memory _description, uint256 _stadiumLat, uint256 _stadiumLng, uint256 _geoRadius, uint256 _startTime, uint256 _endTime, string memory _rewardTier, uint256 _rewardPoints, address _sponsor) external returns (uint256)",
   "function getUserNFTs(address _user) external view returns (uint256[] memory)",
   "event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 indexed campaignId)"
 ];
 
-// Mint NFT via MetaMask
+// Generate proof and mint NFT via MetaMask (EIP-712 signed)
 async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, lng) {
   if (!window.ethereum) throw new Error('MetaMask not installed');
   
+  // Step 1: Get signed proof from backend
+  const proofResponse = await fetch(`${BACKEND_URL}/generate-proof`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user: walletAddress,
+      campaignId: campaignId || 0,
+      lat: lat,
+      lng: lng,
+      stadiumId: stadiumName
+    })
+  });
+  
+  const proofData = await proofResponse.json();
+  if (!proofData.success) {
+    throw new Error(proofData.error || 'Failed to generate proof');
+  }
+  
+  // Step 2: Call contract with signed proof
   const provider = new ethers.BrowserProvider(window.ethereum);
   await provider.send('eth_requestAccounts', []);
   const signer = await provider.getSigner();
   
-  const contract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
-  const tx = await contract.mintAttendanceNFT(
-    walletAddress,
-    campaignId,
-    `https://pslfanchain.io/nft/${Date.now()}`,
-    Math.floor(lat * 1000000),
-    Math.floor(lng * 1000000),
-    stadiumName
+  const contract = new ethers.Contract(proofData.contractAddress, NFT_ABI, signer);
+  
+  const tx = await contract.mintWithSignature(
+    [
+      proofData.proof.user,
+      proofData.proof.campaignId,
+      proofData.proof.lat,
+      proofData.proof.lng,
+      proofData.proof.timestamp,
+      proofData.proof.nonce
+    ],
+    proofData.signature,
+    `https://pslfanchain.io/nft/${Date.now()}`
   );
   
   const receipt = await tx.wait();

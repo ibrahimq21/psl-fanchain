@@ -60,8 +60,127 @@ contract FanChain is ERC721, Ownable {
     event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 campaignId);
     event EarningsClaimed(address indexed influencer, uint256 amount);
 
+    // EIP-712 Domain Separator
+    bytes32 public DOMAIN_SEPARATOR;
+    string constant DOMAIN_NAME = "PSL FanChain";
+    string constant DOMAIN_VERSION = "1";
+
+    // Verification struct for signed minting
+    struct CheckInProof {
+        address user;
+        uint256 campaignId;
+        uint256 lat;
+        uint256 lng;
+        uint256 timestamp;
+        uint256 nonce;
+    }
+
+    // Hash for verification
+    bytes32 public constant CHECKIN_TYPEHASH = keccak256(
+        "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce)"
+    );
+
+    // Mapping of used nonces (one-time use)
+    mapping(bytes32 => bool) public usedProofs;
+    
+    // Track if user already minted for campaign
+    mapping(address => mapping(uint256 => bool)) public hasMintedCampaign;
+
     constructor(address _platformWallet) ERC721("PSL FanChain", "PSLF") {
         platformWallet = _platformWallet;
+        
+        // Initialize EIP-712 domain separator
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(DOMAIN_NAME)),
+                keccak256(bytes(DOMAIN_VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
+    }
+
+    // Verify EIP-712 signature and mint NFT
+    function mintWithSignature(
+        CheckInProof calldata proof,
+        bytes calldata signature,
+        string memory _tokenURI
+    ) external {
+        // Verify campaign exists and is active
+        Campaign storage campaign = campaigns[proof.campaignId];
+        require(campaign.id == proof.campaignId, "Campaign not found");
+        require(campaign.active, "Campaign not active");
+        
+        // Verify timestamp is within campaign window
+        require(block.timestamp >= campaign.startTime, "Campaign not started");
+        require(block.timestamp <= campaign.endTime, "Campaign ended");
+        
+        // Verify user hasn't already minted for this campaign
+        require(!hasMintedCampaign[proof.user][proof.campaignId], "Already minted");
+        
+        // Create proof hash
+        bytes32 proofHash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            DOMAIN_SEPARATOR,
+            keccak256(abi.encode(
+                CHECKIN_TYPEHASH,
+                proof.user,
+                proof.campaignId,
+                proof.lat,
+                proof.lng,
+                proof.timestamp,
+                proof.nonce
+            ))
+        ));
+        
+        // Verify signature from server (platform wallet)
+        require(proofHash.length == 32, "Invalid proof");
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        
+        // Split signature
+        require(signature.length == 65, "Invalid signature length");
+        assembly {
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 32))
+            v := byte(0, calldataload(add(signature.offset, 64)))
+        }
+        
+        // Verify signer is platform wallet
+        require(ecrecover(proofHash, v, r, s) == platformWallet, "Invalid signature");
+        
+        // Mark proof as used
+        usedProofs[proofHash] = true;
+        
+        // Mark user as minted for this campaign
+        hasMintedCampaign[proof.user][proof.campaignId] = true;
+        
+        // Mint NFT
+        uint256 newTokenId = _tokenIds.current();
+        _mint(proof.user, newTokenId);
+        _setTokenURI(newTokenId, _tokenURI);
+        
+        // Store attendance
+        nfts[newTokenId] = AttendanceNFT({
+            tokenId: newTokenId,
+            owner: proof.user,
+            campaignId: proof.campaignId,
+            timestamp: block.timestamp,
+            lat: proof.lat,
+            lng: proof.lng,
+            influencerId: Strings.toHexString(campaign.creator)
+        });
+        
+        userNFTs[proof.user].push(newTokenId);
+        
+        // Update influencer earnings
+        influencerEarnings[campaign.creator] += campaign.rewardPoints;
+        totalCheckIns[campaign.creator]++;
+        
+        emit NFTMinted(newTokenId, proof.user, proof.campaignId);
+        _tokenIds.increment();
     }
 
     // Create new campaign
