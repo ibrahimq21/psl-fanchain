@@ -848,27 +848,15 @@ app.post('/verify', async (req, res) => {
   
   checkInStore.push(checkIn);
   
-  // Mint NFT on blockchain (required for actual minting)
-  let blockchainResult;
-  try {
-    blockchainResult = await mintNFTOnChain(
-      payload.deviceId || 'unknown',
-      payload.stadiumId,
-      payload.stadiumId,
-      stadium.name,
-      payload.lat,
-      payload.lng
-    );
-  } catch (blockchainErr) {
-    console.log('❌ Blockchain mint failed:', blockchainErr.message);
-    return res.status(500).json({
-      success: false,
-      checkIn,
-      blockchain: { success: false, error: blockchainErr.message },
-      message: 'Check-in verified but NFT minting failed'
-    });
-  }
-  }
+  // NOTE: NFT minting now happens on frontend via MetaMask
+  // See frontend handleCheckIn() -> calls contract directly
+  // For now, just return check-in verified
+  
+  return res.json({
+    success: true,
+    checkIn,
+    message: 'Check-in verified! Mint NFT via MetaMask to complete.'
+  });
   
  
 );
