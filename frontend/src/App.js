@@ -17,7 +17,8 @@ L.Icon.Default.mergeOptions({
 // Backend API URL - use env or default to localhost
 const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 
-
+// WireFluid Config
+const NFT_ADDRESS = process.env.REACT_APP_NFT_ADDRESS || '0xf2C11750fff6b14EC12aa7b2cB71c775264C7e01';
 
 // FanChain NFT ABI - simple test function
 const NFT_ABI = [
