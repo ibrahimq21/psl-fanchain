@@ -19,9 +19,9 @@ const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 
 
 
-// FanChain NFT ABI - mintWithSignature function (EIP-712 signed minting)
+// FanChain NFT ABI - mintWithSignature function (individual params)
 const NFT_ABI = [
-  "function mintWithSignature((address user, uint256 campaignId, uint256 lat, uint256 lng, uint256 timestamp, uint256 nonce, uint256 expiry) calldata proof, bytes calldata signature, string memory _tokenURI) external",
+  "function mintWithSignature(address user, uint256 campaignId, uint256 lat, uint256 lng, uint256 timestamp, uint256 nonce, uint256 expiry, bytes signature, string _tokenURI) external",
   "function createCampaign(string memory _name, string memory _description, uint256 _stadiumLat, uint256 _stadiumLng, uint256 _geoRadius, uint256 _startTime, uint256 _endTime, string memory _rewardTier, uint256 _rewardPoints, address _sponsor) external returns (uint256)",
   "function getUserNFTs(address _user) external view returns (uint256[] memory)",
   "event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 indexed campaignId)"
@@ -65,29 +65,17 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
   
   const contract = new ethers.Contract(proofData.contractAddress, NFT_ABI, signer);
   
-  // Use contract interface to properly encode the function call
-  const iface = new ethers.Interface(NFT_ABI);
-  const encodedData = iface.encodeFunctionData(
-    "mintWithSignature",
-    [
-      [
-        proofData.proof.user,
-        proofData.proof.campaignId.toString(),
-        proofData.proof.lat.toString(),
-        proofData.proof.lng.toString(),
-        proofData.proof.timestamp.toString(),
-        proofData.proof.nonce,
-        proofData.proof.expiry.toString()
-      ],
-      proofData.signature,
-      `https://pslfanchain.io/nft/${Date.now()}`
-    ]
+  const tx = await contract.mintWithSignature(
+    proofData.proof.user,
+    proofData.proof.campaignId.toString(),
+    proofData.proof.lat.toString(),
+    proofData.proof.lng.toString(),
+    proofData.proof.timestamp.toString(),
+    proofData.proof.nonce,
+    proofData.proof.expiry.toString(),
+    proofData.signature,
+    `https://pslfanchain.io/nft/${Date.now()}`
   );
-  
-  const tx = await signer.sendTransaction({
-    to: proofData.contractAddress,
-    data: encodedData
-  });
   
   const receipt = await tx.wait();
   return receipt.hash;

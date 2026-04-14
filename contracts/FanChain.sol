@@ -102,15 +102,21 @@ contract FanChain is ERC721, Ownable {
         );
     }
 
-    // Verify EIP-712 signature and mint NFT
+    // Mint NFT with signed proof (individual params)
     function mintWithSignature(
-        CheckInProof calldata proof,
+        address user,
+        uint256 campaignId,
+        uint256 lat,
+        uint256 lng,
+        uint256 timestamp,
+        uint256 nonce,
+        uint256 expiry,
         bytes calldata signature,
         string memory _tokenURI
     ) external {
         // Verify campaign exists and is active
-        Campaign storage campaign = campaigns[proof.campaignId];
-        require(campaign.id == proof.campaignId, "Campaign not found");
+        Campaign storage campaign = campaigns[campaignId];
+        require(campaign.id == campaignId, "Campaign not found");
         require(campaign.active, "Campaign not active");
         
         // Verify timestamp is within campaign window
@@ -118,10 +124,10 @@ contract FanChain is ERC721, Ownable {
         require(block.timestamp <= campaign.endTime, "Campaign ended");
         
         // Verify proof hasn't expired
-        require(block.timestamp <= proof.expiry, "Proof expired");
+        require(block.timestamp <= expiry, "Proof expired");
         
         // Verify user hasn't already minted for this campaign
-        require(!hasMintedCampaign[proof.user][proof.campaignId], "Already minted");
+        require(!hasMintedCampaign[user][campaignId], "Already minted");
         
         // Create proof hash
         bytes32 proofHash = keccak256(abi.encodePacked(
@@ -129,13 +135,13 @@ contract FanChain is ERC721, Ownable {
             DOMAIN_SEPARATOR,
             keccak256(abi.encode(
                 CHECKIN_TYPEHASH,
-                proof.user,
-                proof.campaignId,
-                proof.lat,
-                proof.lng,
-                proof.timestamp,
-                proof.nonce,
-                proof.expiry
+                user,
+                campaignId,
+                lat,
+                lng,
+                timestamp,
+                nonce,
+                expiry
             ))
         ));
         
@@ -160,31 +166,31 @@ contract FanChain is ERC721, Ownable {
         usedProofs[proofHash] = true;
         
         // Mark user as minted for this campaign
-        hasMintedCampaign[proof.user][proof.campaignId] = true;
+        hasMintedCampaign[user][campaignId] = true;
         
         // Mint NFT
         uint256 newTokenId = _tokenIds.current();
-        _mint(proof.user, newTokenId);
+        _mint(user, newTokenId);
         _setTokenURI(newTokenId, _tokenURI);
         
         // Store attendance
         nfts[newTokenId] = AttendanceNFT({
             tokenId: newTokenId,
-            owner: proof.user,
-            campaignId: proof.campaignId,
+            owner: user,
+            campaignId: campaignId,
             timestamp: block.timestamp,
-            lat: proof.lat,
-            lng: proof.lng,
+            lat: lat,
+            lng: lng,
             influencerId: Strings.toHexString(campaign.creator)
         });
         
-        userNFTs[proof.user].push(newTokenId);
+        userNFTs[user].push(newTokenId);
         
         // Update influencer earnings
         influencerEarnings[campaign.creator] += campaign.rewardPoints;
         totalCheckIns[campaign.creator]++;
         
-        emit NFTMinted(newTokenId, proof.user, proof.campaignId);
+        emit NFTMinted(newTokenId, user, campaignId);
         _tokenIds.increment();
     }
 
