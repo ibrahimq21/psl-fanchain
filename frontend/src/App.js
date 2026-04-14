@@ -436,24 +436,82 @@ function App() {
         setScannerActive(false);
       }
       
-      const ticketId = decodedText.trim();
-      setScanResult(ticketId);
-      setMessage(`Scanned: ${ticketId}`);
+      const ticketData = decodedText.trim();
+      setScanResult(ticketData);
+      setMessage('🔄 Processing QR...');
       
-      // Try to match with venues/campaigns
-      const stadium = venues.find(s => 
-        s.id === ticketId || 
-        s.name.toLowerCase().includes(ticketId.toLowerCase())
-      );
-      
-      if (stadium) {
-        setSelectedStadium(stadium);
-        setMessage(`Found: ${stadium.name}`);
+      // Step 1: Validate format
+      let qrPayload = null;
+      try {
+        qrPayload = JSON.parse(ticketData);
+        setMessage('📋 Validating ticket...');
+      } catch (e) {
+        // Not JSON - try simple venue match
+        const stadium = venues.find(s => 
+          s.id === ticketData || 
+          s.name.toLowerCase().includes(ticketData.toLowerCase())
+        );
+        if (stadium) {
+          setSelectedStadium(stadium);
+          setMessage(`✅ Found venue: ${stadium.name}`);
+        } else {
+          setMessage(`❌ Unknown ticket: ${ticketData}`);
+        }
+        return;
       }
+      
+      // Step 2: Check it's a signed payload
+      if (!qrPayload || qrPayload.v !== 1 || !qrPayload.campaignId) {
+        setMessage('⚠️ Invalid QR format');
+        return;
+      }
+      
+      setMessage('🔐 Verifying signature...');
+      
+      // Step 3: Verify signature via backend
+      const verifyResult = await fetch(`${BACKEND_URL}/verify-qr-payload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrData: ticketData })
+      }).then(r => r.json());
+      
+      if (!verifyResult.valid) {
+        setMessage(`❌ Invalid: ${verifyResult.error || 'Signature verification failed'}`);
+        return;
+      }
+      
+      // Step 4: Verify check-in (location + one-time use)
+      setMessage('📍 Checking location...');
+      
+      const checkInResult = await fetch(`${BACKEND_URL}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          qrData: ticketData,
+          campaignId: qrPayload.campaignId,
+          stadiumId: qrPayload.stadiumId,
+          wallet: wallet
+        })
+      }).then(r => r.json());
+      
+      if (!checkInResult.valid) {
+        setMessage(`❌ Denied: ${checkInResult.error || checkInResult.reason || 'Verification failed'}`);
+        return;
+      }
+      
+      // Step 5: Success!
+      const stadiumName = verifyResult.campaign?.stadiumName || 'Stadium';
+      setMessage(`✅ Verified! +${verifyResult.campaign?.pointsPerCheckIn || 100} pts`);
+      
+      // Step 6: Mint NFT (optional)
+      setMessage('🎫 Minting NFT...');
+      // ... NFT mint logic
+      
     } catch (e) {
       console.error('Scan error:', e);
+      setMessage(`❌ Error: ${e.message}`);
     } finally {
-      setTimeout(() => { scanLockRef.current = false; }, 2500);
+      setTimeout(() => { scanLockRef.current = false }, 3000);
     }
   };
 
