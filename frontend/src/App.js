@@ -27,7 +27,7 @@ const TOKEN_ADDRESS = process.env.REACT_APP_TOKEN_ADDRESS || '0x401ACD559883227A
 
 // FanChain NFT ABI - mintWithSignature function (EIP-712 signed minting)
 const NFT_ABI = [
-  "function mintWithSignature((address user, uint256 campaignId, uint256 lat, uint256 lng, uint256 timestamp, uint256 nonce) calldata proof, bytes calldata signature, string memory _tokenURI) external",
+  "function mintWithSignature((address user, uint256 campaignId, uint256 lat, uint256 lng, uint256 timestamp, uint256 nonce, uint256 expiry) calldata proof, bytes calldata signature, string memory _tokenURI) external",
   "function createCampaign(string memory _name, string memory _description, uint256 _stadiumLat, uint256 _stadiumLng, uint256 _geoRadius, uint256 _startTime, uint256 _endTime, string memory _rewardTier, uint256 _rewardPoints, address _sponsor) external returns (uint256)",
   "function getUserNFTs(address _user) external view returns (uint256[] memory)",
   "event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 indexed campaignId)"
