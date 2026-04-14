@@ -92,7 +92,10 @@ function App() {
   const [userRedemptions, setUserRedemptions] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
-  const scannerRef = useRef(null);
+  const [scannerActive, setScannerActive] = useState(false);
+  const [scannerError, setScannerError] = useState(null);
+  scannerRef.current = useRef(null);
+  const scanLockRef = useRef(false);
 
 
 
@@ -327,69 +330,145 @@ function App() {
   };
 
   const startScanner = async () => {
+    // Prevent multiple scanner instances
+    if (scannerRef.current) {
+      setMessage('Scanner already running');
+      return;
+    }
+    
+    setScannerError(null);
     setMessage('Starting camera...');
+    
     try {
-      // Clean previous scanner first
+      // Stop any existing scanner first
       await stopScanner();
-
-      // Small delay to ensure cleanup
-      await new Promise(r => setTimeout(r, 200));
-
+      
+      // Wait for cleanup
+      await new Promise(r => setTimeout(r, 300));
+      
       const element = document.getElementById('qr-reader');
       if (!element) {
+        setScannerError('Scanner element not found');
         setMessage('Scanner element not found');
         return;
       }
-
-      // Create video container
-      element.innerHTML = '<div id="qr-video-container" style="width:100%;height:250px;background:#000;border-radius:10px;position:relative;"></div>';
-
-      const qrCode = new Html5Qrcode('qr-video-container');
+      
+      // Use React state to show scanner is active (instead of innerHTML)
+      setScannerActive(true);
+      
+      const qrCode = new Html5Qrcode('qr-reader');
       scannerRef.current = qrCode;
-
+      
       await qrCode.start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 200, height: 200 } },
-        (decodedText) => {
-          qrCode.stop().then(() => {
+        async (decodedText) => {
+          // Debounce: prevent multiple scans
+          if (scanLockRef.current) return;
+          scanLockRef.current = true;
+          
+          try {
+            // Stop scanner first
+            await qrCode.stop();
+            setScannerActive(false);
+            
+            // Strict QR payload validation
+            const validation = validateQRPayload(decodedText);
+            if (!validation.valid) {
+              setMessage(`Invalid QR: ${validation.error}`);
+              scanLockRef.current = false;
+              return;
+            }
+            
             setScanResult(decodedText);
             setMessage(`Scanned: ${decodedText}`);
-            const stadium = venues.find(s => s.id === decodedText || s.name.toLowerCase().includes(decodedText.toLowerCase()));
+            
+            const stadium = venues.find(s => 
+              s.id === decodedText || 
+              s.name.toLowerCase().includes(decodedText.toLowerCase())
+            );
+            
             if (stadium) {
               setSelectedStadium(stadium);
               setMessage(`Found: ${stadium.name}`);
             }
-          }).catch(() => { });
+          } catch (e) {
+            console.error('Scan processing error:', e);
+          } finally {
+            // Release lock after delay
+            setTimeout(() => { scanLockRef.current = false; }, 2000);
+          }
         },
-        () => {
+        (errorMessage) => {
           // Ignore scan errors silently
         }
       );
-
+      
       setMessage('Point camera at QR code');
     } catch (err) {
+      setScannerError(err.message);
       setMessage('Camera error: ' + err.message);
-      console.error(err);
+      console.error('Scanner error:', err);
     }
   };
 
   const stopScanner = async () => {
     try {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        await scannerRef.current.stop();
+      if (scannerRef.current) {
+        const isCurrentlyScanning = scannerRef.current.isScanning;
+        if (isCurrentlyScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
         scannerRef.current = null;
       }
     } catch (e) {
+      console.log('Scanner cleanup:', e.message);
+    } finally {
       scannerRef.current = null;
-    }
-    // Clear the video container manually
-    const container = document.getElementById('qr-reader');
-    if (container) {
-      container.innerHTML = '';
+      setScannerActive(false);
     }
   };
 
+  // Strict QR payload validation
+  const validateQRPayload = (data) => {
+    if (!data || typeof data !== 'string') {
+      return { valid: false, error: 'Empty or invalid data' };
+    }
+    
+    const trimmed = data.trim();
+    
+    // Minimum length check
+    if (trimmed.length < 2) {
+      return { valid: false, error: 'Too short' };
+    }
+    
+    // Maximum length check (prevent DoS)
+    if (trimmed.length > 200) {
+      return { valid: false, error: 'Too long' };
+    }
+    
+    // Check for suspicious patterns
+    const suspicious = ['<script', 'javascript:', 'data:', 'onerror', 'onclick'];
+    const lower = trimmed.toLowerCase();
+    for (const pattern of suspicious) {
+      if (lower.includes(pattern)) {
+        return { valid: false, error: 'Suspicious pattern detected' };
+      }
+    }
+    
+    return { valid: true };
+  };
+
   const verifyTicketData = (ticketData) => {
+    // Validate before sending
+    const validation = validateQRPayload(ticketData);
+    if (!validation.valid) {
+      setMessage(`Invalid ticket: ${validation.error}`);
+      return;
+    }
+    
+    setMessage('Verifying ticket...');
     fetch(`${BACKEND_URL}/tickets/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -401,6 +480,8 @@ function App() {
       })
     }).then(r => r.json()).then(data => {
       setMessage(data.entryAllowed ? '✅ ENTRY ALLOWED - ' + (data.reason || 'Verified') : '❌ ENTRY DENIED - ' + (data.reason || 'Failed'));
+    }).catch(err => {
+      setMessage('Verification failed: ' + err.message);
     });
   };
 
