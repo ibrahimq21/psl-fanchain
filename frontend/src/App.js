@@ -4,6 +4,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { MapContainer, TileLayer, Marker, Circle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { ethers } from 'ethers';
 
 // Fix leaflet marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -23,6 +24,36 @@ const CHAIN_ID = parseInt(process.env.REACT_APP_CHAIN_ID) || 92533;
 // Contract Addresses - dynamically loaded from env
 const NFT_ADDRESS = process.env.REACT_APP_NFT_ADDRESS || '0x7Ddb788669d63F20abeCBF55C74604a074681523';
 const TOKEN_ADDRESS = process.env.REACT_APP_TOKEN_ADDRESS || '0x401ACD559883227Ad8A5902bC0dE231f71525316';
+
+// FanChain NFT ABI - mintAttendanceNFT function
+const NFT_ABI = [
+  "function mintAttendanceNFT(address _to, uint256 _campaignId, string memory _tokenURI, uint256 _lat, uint256 _lng, string memory _influencerId) external",
+  "function createCampaign(string memory _name, string memory _description, uint256 _stadiumLat, uint256 _stadiumLng, uint256 _geoRadius, uint256 _startTime, uint256 _endTime, string memory _rewardTier, uint256 _rewardPoints, address _sponsor) external returns (uint256)",
+  "function getUserNFTs(address _user) external view returns (uint256[] memory)",
+  "event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 indexed campaignId)"
+];
+
+// Mint NFT via MetaMask
+async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, lng) {
+  if (!window.ethereum) throw new Error('MetaMask not installed');
+  
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  await provider.send('eth_requestAccounts', []);
+  const signer = await provider.getSigner();
+  
+  const contract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
+  const tx = await contract.mintAttendanceNFT(
+    walletAddress,
+    campaignId,
+    `https://pslfanchain.io/nft/${Date.now()}`,
+    Math.floor(lat * 1000000),
+    Math.floor(lng * 1000000),
+    stadiumName
+  );
+  
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
 
 // Haversine distance function
 function haversineDistance(lat1, lng1, lat2, lng2) {
@@ -253,7 +284,16 @@ function App() {
 
       if (result.success) {
         const stadiumName = result.checkIn?.stadiumName || result.stadiumName || selectedStadium?.name || 'stadium';
-        setMessage(`✅ Check-in successful at ${stadiumName}! +25 pts`);
+        setMessage(`✅ Check-in verified! Signing NFT transaction...`);
+        
+        // Try to mint NFT via MetaMask
+        try {
+          const txHash = await mintNFTWithMetaMask(wallet, 4, stadiumName, payload.lat, payload.lng);
+          setMessage(`✅ Check-in complete at ${stadiumName}! NFT minted: ${txHash.substring(0, 10)}...`);
+        } catch (mintErr) {
+          console.log('MetaMask mint failed:', mintErr.message);
+          setMessage(`✅ Check-in verified at ${stadiumName}! (NFT mint skipped)`);
+        }
         
         // Add score to fan profile
         try {
