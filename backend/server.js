@@ -903,7 +903,7 @@ function signCheckInProof(proofData) {
     throw new Error('PLATFORM_PRIVATE_KEY not configured');
   }
   
-  const contractAddress = (process.env.NFT_CONTRACT_ADDRESS || '0x35f385e2Fd110fc069fc6f643EC9ecb887FAD06a').toLowerCase();
+  const contractAddress = (process.env.NFT_CONTRACT_ADDRESS || '0xEA4A645A16Eb5291343813F24cc5b451E2a48f8d').toLowerCase();
   const chainId = parseInt(process.env.WIREFLUID_CHAIN_ID) || 92533;
   
   // Add expiry to prevent replay (5 minute window)
