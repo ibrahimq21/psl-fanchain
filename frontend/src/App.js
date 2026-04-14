@@ -31,42 +31,15 @@ const NFT_ABI = [
 async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, lng) {
   if (!window.ethereum) throw new Error('MetaMask not installed');
   
-  // Step 1: Get signed proof from backend
-  const proofResponse = await fetch(`${BACKEND_URL}/generate-proof`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user: walletAddress,
-      campaignId: campaignId || 0,
-      lat: lat,
-      lng: lng,
-      stadiumId: stadiumName
-    })
-  });
-  
-  const proofData = await proofResponse.json();
-  console.log(proofData);
-  if (!proofData.success) {
-    throw new Error(proofData.error || 'Failed to generate proof');
-  }
-  
-  // Validate proof data before contract call
-  if (!proofData || !proofData.proof || !proofData.signature || !proofData.contractAddress) {
-    throw new Error('Invalid proof data: missing required fields');
-  }
-  if (!proofData.proof.user || !proofData.proof.campaignId || !proofData.proof.lat || 
-      !proofData.proof.lng || !proofData.proof.timestamp || !proofData.proof.nonce || !proofData.expiry) {
-    throw new Error('Invalid proof: missing proof fields');
-  }
-  
-  // Step 2: Call contract with signed proof
+  // Skip backend proof generation - use mintTest directly
   const provider = new ethers.BrowserProvider(window.ethereum);
   await provider.send('eth_requestAccounts', []);
   const signer = await provider.getSigner();
   
-  const contract = new ethers.Contract(proofData.contractAddress, NFT_ABI, signer);
+  // Use env contract address directly
+  const contract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
   
-  // Use simple test function first to verify connectivity
+  // Use simple test function
   const tx = await contract.mintTest(
     walletAddress,
     `https://pslfanchain.io/nft/${Date.now()}`
