@@ -65,18 +65,21 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
   
   const contract = new ethers.Contract(proofData.contractAddress, NFT_ABI, signer);
   
+  // Pass proof as struct object for proper ABI encoding
+  const proofStruct = [
+    proofData.proof.user,
+    proofData.proof.campaignId,
+    proofData.proof.lat,
+    proofData.proof.lng,
+    proofData.proof.timestamp,
+    proofData.proof.nonce,
+    proofData.proof.expiry
+  ];
+  
   const tx = await contract.mintWithSignature(
-    [
-      proofData.proof.user,
-      proofData.proof.campaignId,
-      proofData.proof.lat,
-      proofData.proof.lng,
-      proofData.proof.timestamp,
-      proofData.proof.nonce,
-      proofData.expiry
-    ],
+    proofStruct,
     proofData.signature,
-    `${BACKEND_URL}/nft/${Date.now()}`
+    `https://pslfanchain.io/nft/${Date.now()}`
   );
   
   const receipt = await tx.wait();
