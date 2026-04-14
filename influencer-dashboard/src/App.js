@@ -232,14 +232,14 @@ function App() {
   };
 
   const generateQRCode = (campaignId) => {
-    // Simple fallback QR with campaignId
-    return `${QR_API_URL}?size=200x200&data=${campaignId}`;
+    // Use plain campaignId string - no URL encoding needed for QR
+    return `${QR_API_URL}?size=300x300&data=${encodeURIComponent(campaignId)}&chose=M&chf=bg%2Cs%2CFFFFFFFF`;
   };
   
   // Generate signed QR on demand
   const handleGenerateSignedQR = async (campaign) => {
-    const qrUrl = await generateQRCode(campaign.id, campaign);
-    // Open in new tab or show modal
+    const qrUrl = generateQRCode(campaign.id);
+    // Open in new tab
     window.open(qrUrl, '_blank');
   };
 

@@ -353,30 +353,84 @@ function App() {
         return;
       }
       
-      // Use React state to show scanner is active (instead of innerHTML)
+      // Ensure element is visible and not hidden
+      element.style.display = 'block';
+      element.style.position = 'relative';
+      element.style.zIndex = '1000';
+      
+      // Use React state to show scanner is active
       setScannerActive(true);
       
       const qrCode = new Html5Qrcode('qr-reader');
       scannerRef.current = qrCode;
       
+      // Start scanner with better settings
       await qrCode.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 200, height: 200 } },
+        { facingMode: 'environment', torch: false },
+        { 
+          fps: 5, // Lower FPS for stability
+          qrbox: { width: 280, height: 280 }, // Larger scan area
+          aspectRatio: 1.0
+        },
         async (decodedText) => {
+          // IMMEDIATE LOG - always runs
+          console.log('📷 QR SCANNED:', decodedText);
+          
           // Debounce: prevent multiple scans
           if (scanLockRef.current) return;
           scanLockRef.current = true;
           
           try {
-            // Stop scanner first
+            // Stop scanner immediately
             await qrCode.stop();
             setScannerActive(false);
             
-            // Strict QR payload validation
-            const validation = validateQRPayload(decodedText);
-            if (!validation.valid) {
-              setMessage(`Invalid QR: ${validation.error}`);
-              scanLockRef.current = false;
+            // Log the raw scanned text
+            console.log('Raw scanned text:', decodedText);
+            
+            // Try to parse as JSON first
+            let payload = null;
+            try {
+              payload = JSON.parse(decodedText);
+              console.log('Parsed JSON payload:', payload);
+            } catch (e) {
+              console.log('Not JSON, treating as plain string');
+            }
+            
+            // Plain string - use directly
+            const ticketId = decodedText.trim();
+            setScanResult(ticketId);
+            setMessage(`Scanned: ${ticketId}`);
+            
+            // Try to match with venues/campaigns
+            const stadium = venues.find(s => 
+              s.id === ticketId || 
+              s.name.toLowerCase().includes(ticketId.toLowerCase())
+            );
+            
+            if (stadium) {
+              setSelectedStadium(stadium);
+              setMessage(`Found stadium: ${stadium.name}`);
+            }
+          } catch (e) {
+            console.error('Scan processing error:', e);
+          } finally {
+            // Release lock after delay
+            setTimeout(() => { scanLockRef.current = false; }, 2500);
+          }
+        },
+        (errorMessage) => {
+          // Ignore scan errors silently - they're normal when no QR in view
+        }
+      );
+      
+      setMessage('Point camera at QR code - make sure QR is well-lit and centered');
+    } catch (err) {
+      setScannerError(err.message);
+      setMessage('Camera error: ' + err.message);
+      console.error('Scanner start error:', err);
+    }
+  };
               return;
             }
             
