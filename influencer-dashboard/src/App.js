@@ -43,7 +43,7 @@ function App() {
     fetchCampaigns();
     fetchStats();
     fetchVenues();
-  }, []);
+  }, [fetchCampaigns, fetchStats, fetchVenues]);
 
   const fetchVenues = async () => {
     try {
