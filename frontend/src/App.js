@@ -182,7 +182,14 @@ function App() {
       ]);
       setCheckIns(checkInsRes?.checkIns || checkInsRes || []);
       setNfts(nftsRes?.nfts || nftsRes || []);
-      setRewards(rewardsRes || { points: 0, earnings: 0 });
+      
+      // Handle rewards - backend returns { points, earnings }
+      const rewardsData = rewardsRes || {};
+      setRewards({
+        points: rewardsData.points ?? rewardsData?.fanScore ?? 0,
+        earnings: rewardsData.earnings ?? 0
+      });
+      console.log('Rewards data:', rewardsData);
       setFanProfile(profileRes);
       setUserRedemptions(redemptionsRes.redemptions || []);
     } catch (err) {
@@ -495,15 +502,15 @@ function App() {
                 <div className="stats">
                   <div className="stat-card">
                     <h3>Points</h3>
-                    <p className="stat-value">{rewards?.points || 0}</p>
+                    <p className="stat-value">{fanProfile?.fanScore || rewards?.points || 0}</p>
                   </div>
                   <div className="stat-card">
                     <h3>NFTs</h3>
-                    <p className="stat-value">{nfts.length}</p>
+                    <p className="stat-value">{nfts?.length || 0}</p>
                   </div>
                   <div className="stat-card">
                     <h3>Check-ins</h3>
-                    <p className="stat-value">{checkIns.length}</p>
+                    <p className="stat-value">{checkIns?.length || 0}</p>
                   </div>
                 </div>
               </>
