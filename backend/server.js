@@ -873,6 +873,29 @@ const CHECKIN_TYPEHASH = "0x" + Buffer.from(
   "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce)"
 ).toString("hex");
 
+// Rate limiting for proof generation
+const proofRequests = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_PROOFS_PER_WINDOW = 10; // 10 proofs per minute
+
+function checkRateLimit(wallet) {
+  const now = Date.now();
+  const key = wallet.toLowerCase();
+  
+  if (!proofRequests.has(key)) {
+    proofRequests.set(key, []);
+  }
+  
+  const requests = proofRequests.get(key).filter(t => now - t < RATE_LIMIT_WINDOW);
+  
+  if (requests.length >= MAX_PROOFS_PER_WINDOW) {
+    throw new Error('Rate limit exceeded. Try again later.');
+  }
+  
+  requests.push(now);
+  proofRequests.set(key, requests);
+}
+
 // Generate EIP-712 signature for check-in proof
 function signCheckInProof(proofData) {
   const privateKey = process.env.PLATFORM_PRIVATE_KEY || process.env.PRIVATE_KEY;
@@ -880,7 +903,13 @@ function signCheckInProof(proofData) {
     throw new Error('PLATFORM_PRIVATE_KEY not configured');
   }
   
-  // Create domain separator hash
+  const contractAddress = (process.env.NFT_CONTRACT_ADDRESS || '0x35f385e2Fd110fc069fc6f643EC9ecb887FAD06a').toLowerCase();
+  const chainId = parseInt(process.env.WIREFLUID_CHAIN_ID) || 92533;
+  
+  // Add expiry to prevent replay (5 minute window)
+  const expiry = Math.floor(Date.now() / 1000) + (5 * 60); // 5 minutes
+  
+  // Create domain separator hash with chainId and contract address
   const domainHash = ethers.id(
     ethers.AbiCoder.defaultAbiCoder().encode(
       ["bytes32", "bytes32", "bytes32", "uint256", "address"],
@@ -888,16 +917,16 @@ function signCheckInProof(proofData) {
         ethers.id("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
         ethers.id(EIP712_DOMAIN.name),
         ethers.id(EIP712_DOMAIN.version),
-        EIP712_DOMAIN.chainId,
-        process.env.NFT_CONTRACT_ADDRESS || '0x35f385e2Fd110fc069fc6f643EC9ecb887FAD06a'
+        chainId,
+        contractAddress
       ]
     )
   );
   
-  // Create proof struct hash
+  // Create proof struct hash with expiry
   const proofHash = ethers.id(
     ethers.AbiCoder.defaultAbiCoder().encode(
-      ["bytes32", "address", "uint256", "uint256", "uint256", "uint256", "uint256"],
+      ["bytes32", "address", "uint256", "uint256", "uint256", "uint256", "uint256", "uint256"],
       [
         CHECKIN_TYPEHASH,
         proofData.user,
@@ -905,7 +934,8 @@ function signCheckInProof(proofData) {
         proofData.lat,
         proofData.lng,
         proofData.timestamp,
-        proofData.nonce
+        proofData.nonce,
+        expiry
       ]
     )
   );
@@ -922,7 +952,7 @@ function signCheckInProof(proofData) {
   const wallet = new ethers.Wallet(privateKey);
   const signature = wallet.signMessage(ethers.getBytes(signedMessageHash));
   
-  return signature;
+  return { signature, expiry };
 }
 
 // Generate signed proof endpoint
@@ -933,22 +963,30 @@ app.post('/generate-proof', async (req, res) => {
     return res.status(400).json({ error: 'user and campaignId required' });
   }
   
+  // Check rate limit
+  try {
+    checkRateLimit(user);
+  } catch (rateErr) {
+    return res.status(429).json({ error: rateErr.message });
+  }
+  
   try {
     const proofData = {
       user,
       campaignId: parseInt(campaignId),
-      lat: Math.floor(lat * 1000000),  // Convert to contract format
+      lat: Math.floor(lat * 1000000),
       lng: Math.floor(lng * 1000000),
       timestamp: Math.floor(Date.now() / 1000),
       nonce: crypto.randomBytes(16).toString('hex')
     };
     
-    const signature = signCheckInProof(proofData);
+    const { signature, expiry } = signCheckInProof(proofData);
     
     res.json({
       success: true,
       proof: proofData,
       signature,
+      expiry,
       contractAddress: process.env.NFT_CONTRACT_ADDRESS || '0x35f385e2Fd110fc069fc6f643EC9ecb887FAD06a'
     });
   } catch (err) {

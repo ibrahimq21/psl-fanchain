@@ -69,7 +69,8 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
       proofData.proof.lat,
       proofData.proof.lng,
       proofData.proof.timestamp,
-      proofData.proof.nonce
+      proofData.proof.nonce,
+      proofData.expiry
     ],
     proofData.signature,
     `https://pslfanchain.io/nft/${Date.now()}`

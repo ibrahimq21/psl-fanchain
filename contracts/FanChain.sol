@@ -73,11 +73,12 @@ contract FanChain is ERC721, Ownable {
         uint256 lng;
         uint256 timestamp;
         uint256 nonce;
+        uint256 expiry;
     }
 
     // Hash for verification
     bytes32 public constant CHECKIN_TYPEHASH = keccak256(
-        "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce)"
+        "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce,uint256 expiry)"
     );
 
     // Mapping of used nonces (one-time use)
@@ -116,6 +117,9 @@ contract FanChain is ERC721, Ownable {
         require(block.timestamp >= campaign.startTime, "Campaign not started");
         require(block.timestamp <= campaign.endTime, "Campaign ended");
         
+        // Verify proof hasn't expired
+        require(block.timestamp <= proof.expiry, "Proof expired");
+        
         // Verify user hasn't already minted for this campaign
         require(!hasMintedCampaign[proof.user][proof.campaignId], "Already minted");
         
@@ -130,7 +134,8 @@ contract FanChain is ERC721, Ownable {
                 proof.lat,
                 proof.lng,
                 proof.timestamp,
-                proof.nonce
+                proof.nonce,
+                proof.expiry
             ))
         ));
         
