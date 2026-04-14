@@ -364,13 +364,12 @@ function App() {
       const qrCode = new Html5Qrcode('qr-reader');
       scannerRef.current = qrCode;
       
-      // Start scanner with better settings
+      // Start scanner with simpler config
       await qrCode.start(
-        { facingMode: 'environment', torch: false },
+        'environment',
         { 
-          fps: 5, // Lower FPS for stability
-          qrbox: { width: 280, height: 280 }, // Larger scan area
-          aspectRatio: 1.0
+          fps: 5,
+          qrbox: 250
         },
         async (decodedText) => {
           // IMMEDIATE LOG - always runs
