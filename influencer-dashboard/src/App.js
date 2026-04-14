@@ -64,6 +64,7 @@ function App() {
   const [wallet, setWallet] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
   const [stats, setStats] = useState({ totalCampaigns: 0, totalParticipants: 0, totalRewards: 0 });
+  const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [notification, setNotification] = useState(null);
   const [venues, setVenues] = useState([]); // Load from backend
