@@ -286,6 +286,9 @@ function App() {
           const txHash = await mintNFTWithMetaMask(wallet, 4, stadiumName, payload.lat, payload.lng);
           console.log(txHash);
           setMessage(`✅ Check-in complete at ${stadiumName}! NFT minted: ${txHash.substring(0, 10)}...`);
+          
+          // Refresh wallet data after successful mint
+          fetchWalletData(wallet);
         } catch (mintErr) {
           console.log('MetaMask mint failed:', mintErr.message);
           setMessage(`✅ Check-in verified at ${stadiumName}! (NFT mint skipped)`);
