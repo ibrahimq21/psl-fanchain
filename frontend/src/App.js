@@ -364,26 +364,46 @@ function App() {
       const qrCode = new Html5Qrcode('qr-reader');
       scannerRef.current = qrCode;
       
-      // Start scanner - try back camera first
+      // Enumerate devices and find optimal camera
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      
+      if (videoDevices.length === 0) {
+        throw new Error('No camera found');
+      }
+      
+      // Prefer back camera (environment), fallback to any available
+      let selectedDevice = videoDevices.find(d => 
+        d.label.toLowerCase().includes('back') || 
+        d.label.toLowerCase().includes('rear')
+      ) || videoDevices[0];
+      
+      console.log('Using camera:', selectedDevice.label, selectedDevice.deviceId);
+      
+      // Start scanner with exact deviceId
       try {
         await qrCode.start(
-          'environment',
+          { deviceId: { exact: selectedDevice.deviceId } },
           { fps: 5, qrbox: 250 },
           (decodedText) => processScan(decodedText),
           () => {}
         );
       } catch (err) {
-        // Try front camera if back fails
-        console.log('Back camera failed, trying front:', err.message);
-        try {
-          await qrCode.start(
-            'user',
-            { fps: 5, qrbox: 250 },
-            (decodedText) => processScan(decodedText),
-            () => {}
-          );
-        } catch (err2) {
-          throw new Error('No camera available: ' + err2.message);
+        // Try any other camera if preferred fails
+        console.log('Camera failed, trying fallback:', err.message);
+        for (const device of videoDevices) {
+          if (device.deviceId === selectedDevice.deviceId) continue;
+          try {
+            await qrCode.start(
+              { deviceId: { exact: device.deviceId } },
+              { fps: 5, qrbox: 250 },
+              (decodedText) => processScan(decodedText),
+              () => {}
+            );
+            break;
+          } catch (e) {
+            console.log('Device failed:', device.label);
+          }
         }
       }
       
