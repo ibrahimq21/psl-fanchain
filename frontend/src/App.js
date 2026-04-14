@@ -73,7 +73,7 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
       proofData.expiry
     ],
     proofData.signature,
-    `https://pslfanchain.io/nft/${Date.now()}`
+    `${BACKEND_URL}/nft/${Date.now()}`
   );
   
   const receipt = await tx.wait();
