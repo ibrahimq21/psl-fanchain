@@ -870,7 +870,7 @@ const EIP712_DOMAIN = {
 
 // CheckInProof type hash (must match contract)
 const CHECKIN_TYPEHASH = "0x" + Buffer.from(
-  "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce)"
+  "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce,uint256 expiry)"
 ).toString("hex");
 
 // Rate limiting for proof generation

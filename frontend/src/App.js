@@ -17,13 +17,7 @@ L.Icon.Default.mergeOptions({
 // Backend API URL - use env or default to localhost
 const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 
-// WireFluid Config
-const WIREFLUID_RPC = process.env.REACT_APP_WIREFLUID_RPC || 'https://evm.wirefluid.com';
-const CHAIN_ID = parseInt(process.env.REACT_APP_CHAIN_ID) || 92533;
 
-// Contract Addresses - dynamically loaded from env
-const NFT_ADDRESS = process.env.REACT_APP_NFT_ADDRESS || '0x7Ddb788669d63F20abeCBF55C74604a074681523';
-const TOKEN_ADDRESS = process.env.REACT_APP_TOKEN_ADDRESS || '0x401ACD559883227Ad8A5902bC0dE231f71525316';
 
 // FanChain NFT ABI - mintWithSignature function (EIP-712 signed minting)
 const NFT_ABI = [
