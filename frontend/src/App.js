@@ -1,5 +1,3 @@
-/* eslint-disable no-undef */
-/* global BigInt */
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -67,15 +65,15 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
   
   const contract = new ethers.Contract(proofData.contractAddress, NFT_ABI, signer);
   
-  // Convert string numbers to BigInt for proper uint256 encoding
+  // Convert all numeric values properly for uint256
   const proofValues = [
     proofData.proof.user,
-    BigInt(proofData.proof.campaignId),
-    BigInt(proofData.proof.lat),
-    BigInt(proofData.proof.lng),
-    BigInt(proofData.proof.timestamp),
+    proofData.proof.campaignId.toString(),
+    proofData.proof.lat.toString(),
+    proofData.proof.lng.toString(),
+    proofData.proof.timestamp.toString(),
     proofData.proof.nonce,
-    BigInt(proofData.proof.expiry)
+    proofData.proof.expiry.toString()
   ];
   
   const tx = await contract.mintWithSignature(
