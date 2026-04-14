@@ -49,6 +49,15 @@ async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, 
     throw new Error(proofData.error || 'Failed to generate proof');
   }
   
+  // Validate proof data before contract call
+  if (!proofData || !proofData.proof || !proofData.signature || !proofData.contractAddress) {
+    throw new Error('Invalid proof data: missing required fields');
+  }
+  if (!proofData.proof.user || !proofData.proof.campaignId || !proofData.proof.lat || 
+      !proofData.proof.lng || !proofData.proof.timestamp || !proofData.proof.nonce || !proofData.expiry) {
+    throw new Error('Invalid proof: missing proof fields');
+  }
+  
   // Step 2: Call contract with signed proof
   const provider = new ethers.BrowserProvider(window.ethereum);
   await provider.send('eth_requestAccounts', []);
