@@ -366,119 +366,132 @@ function App() {
     }
   };
 
-  const handleCheckIn = async (stadiumId) => {
-    // Check if in test mode
+  // ==================== Unified Check-In State Machine ====================
+  
+  // State machine states
+  const CHECKIN_STATE = {
+    IDLE: 'idle',
+    RESOLVING: 'resolving',     // Step 1: Get venue (GPS/QR)
+    VALIDATING: 'validating',   // Step 2: Server validation
+    EXECUTING: 'executing',   // Step 3: Mint transaction
+    COMPLETE: 'complete',
+    ERROR: 'error'
+  };
+  
+  // Unified check-in flow - single pipeline for test and production
+  const executeCheckIn = async (stadiumId) => {
+    const targetStadium = stadiumId || selectedStadium?.id || venues[0]?.id;
     const isTestMode = selectedStadium?.isTest || simulateCheckIn;
     
-    // Use selectedStadium or first available venue
-    const targetStadium = stadiumId || selectedStadium?.id || venues[0]?.id;
-    if (!wallet) return;
-    if (!targetStadium) {
-      setMessage('No venue selected');
+    // Validate prerequisites
+    if (!wallet) {
+      setMessage('⚠️ Connect wallet first');
       return;
     }
+    if (!targetStadium) {
+      setMessage('⚠️ No venue selected');
+      return;
+    }
+    
     setLoading(true);
+    let currentState = CHECKIN_STATE.RESOLVING;
     
     try {
-      // Test Mode: Bypass geo validation, use user's nearby location, mint on-chain
-      if (isTestMode) {
-        const testVenue = selectedStadium;
-        const mintLat = testVenue?.baseLat || userLocation?.lat;
-        const mintLng = testVenue?.baseLng || userLocation?.lng;
-        
-        setMessage('⚡ Test Mode: Minting NFT from your location...');
-        
-        const testTokenURI = `https://psl-fanchain.onrender.com/nft/test-${Date.now()}`;
-        
-        // Call smart contract mintTest function with real nearby coords
-        try {
-          const txHash = await mintNFTWithMetaMask(
-            wallet, 
-            4,  // Campaign ID
-            testVenue?.name || 'Test Campaign', 
-            mintLat,
-            mintLng
-          );
-          setMessage(`✅ Test NFT minted from (${mintLat?.toFixed(4)}, ${mintLng?.toFixed(4)})! Tx: ${txHash.substring(0, 12)}...`);
-        } catch (mintErr) {
-          console.error('Mint failed:', mintErr);
-          setMessage(`✅ Test check-in from (${mintLat?.toFixed(4)}, ${mintLng?.toFixed(4)})! (simulated)`);
-        }
-        
-        setLoading(false);
-        fetchWalletData(wallet);
-        return;
+      // ===== STEP 1: Resolve Venue =====
+      currentState = CHECKIN_STATE.RESOLVING;
+      setMessage('📍 Resolving venue...');
+      
+      const venue = venues.find(v => v.id === targetStadium) || selectedStadium;
+      if (!venue) throw new Error('Venue not found');
+      
+      // Get check-in location
+      const checkInLat = isTestMode ? (venue.baseLat || userLocation?.lat) : userLocation?.lat;
+      const checkInLng = isTestMode ? (venue.baseLng || userLocation?.lng) : userLocation?.lng;
+      
+      if (!checkInLat || !checkInLng) {
+        throw new Error(isTestMode ? 'Test location unavailable' : 'Location required. Enable GPS.');
       }
       
-      // Normal Mode: Require actual location
-      const payload = {
-        lat: userLocation?.lat,
-        lng: userLocation?.lng,
+      const checkInData = {
+        venueId: venue.id,
+        venueName: venue.name,
+        lat: checkInLat,
+        lng: checkInLng,
         timestamp: Math.floor(Date.now() / 1000),
         nonce: Math.random().toString(36).substring(7),
-        stadiumId,
-        deviceId: wallet,
-        isMockLocation: false,
-        isEmulator: false,
-        sensorMismatch: false
+        isTestMode,
+        wallet
       };
       
-      // Require actual location for check-in
-      if (!userLocation?.lat || !userLocation?.lng) {
-        setMessage('⚠️ Location required. Enable GPS.');
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(`${BACKEND_URL}/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payload, signature: 'demo-signature' })
-      });
-      console.log(response)
-      const result = await response.json();
-
-      if (result.success) {
-        const stadiumName = result.checkIn?.stadiumName || result.stadiumName || selectedStadium?.name || 'stadium';
-        setMessage(`✅ Check-in verified! Signing NFT transaction...`);
-        
-        // Try to mint NFT via MetaMask
-        try {
-          const txHash = await mintNFTWithMetaMask(wallet, 4, stadiumName, payload.lat, payload.lng);
-          console.log(txHash);
-          setMessage(`✅ Check-in complete at ${stadiumName}! NFT minted: ${txHash.substring(0, 10)}...`);
-          
-          // Refresh wallet data after successful mint
-          fetchWalletData(wallet);
-        } catch (mintErr) {
-          console.log('MetaMask mint failed:', mintErr.message);
-          setMessage(`✅ Check-in verified at ${stadiumName}! (NFT mint skipped)`);
-        }
-        
-        // Add score to fan profile
-        try {
-          await fetch(`${BACKEND_URL}/profile/${wallet}/score`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              eventType: 'checkin',
-              metadata: { stadiumId: result.checkIn?.stadiumId }
-            })
-          });
-        } catch (e) {
-          console.error('Failed to add score:', e);
-        }
-        
-        fetchWalletData(wallet);
-        
+      // ===== STEP 2: Validate (server-side or skip for test) =====
+      currentState = CHECKIN_STATE.VALIDATING;
+      setMessage(isTestMode ? '⏩ Test mode: Skipping validation' : '🔐 Validating check-in...');
+      
+      let validationResult;
+      
+      if (isTestMode) {
+        // Test mode: skip server validation, use mock result
+        validationResult = { success: true, simulated: true };
       } else {
-        setMessage(result.message || 'Check-in failed');
+        // Production: call backend validation API
+        const response = await fetch(`${BACKEND_URL}/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payload: checkInData,
+            signature: 'demo-signature'
+          })
+        });
+        validationResult = await response.json();
+        
+        if (!validationResult.success) {
+          throw new Error(validationResult.message || 'Validation failed');
+        }
       }
+      
+      // ===== STEP 3: Execute Mint (unified for test and production) =====
+      currentState = CHECKIN_STATE.EXECUTING;
+      setMessage('⛽ Signing NFT transaction...');
+      
+      const mintResult = await mintNFTWithMetaMask(
+        wallet,
+        4, // campaignId
+        venue.name,
+        checkInLat,
+        checkInLng
+      );
+      
+      // ===== COMPLETE =====
+      currentState = CHECKIN_STATE.COMPLETE;
+      setMessage(
+        isTestMode 
+          ? `✅ Test check-in at ${venue.name}! (${checkInLat.toFixed(4)}, ${checkInLng.toFixed(4)}) Tx: ${mintResult.substring(0, 10)}...`
+          : `✅ Check-in complete at ${venue.name}! NFT minted: ${mintResult.substring(0, 10)}...`
+      );
+      
+      // Refresh wallet data
+      fetchWalletData(wallet);
+      
     } catch (err) {
-      setMessage('Check-in failed');
+      currentState = CHECKIN_STATE.ERROR;
+      console.error(`Check-in failed at ${currentState}:`, err);
+      
+      // Handle specific errors
+      if (err.message.includes('Location')) {
+        setMessage('⚠️ ' + err.message);
+      } else if (err.message.includes('User rejected')) {
+        setMessage('❌ Transaction rejected by user');
+      } else {
+        setMessage('❌ ' + (err.message || 'Check-in failed'));
+      }
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Backward compatibility: route old handleCheckIn to new state machine
+  const handleCheckIn = async (stadiumId) => {
+    await executeCheckIn(stadiumId);
   };
 
   const startScanner = async () => {
