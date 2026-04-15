@@ -1164,7 +1164,7 @@ function App() {
                 <div className="stats">
                   <div className="stat-card">
                     <h3>Points</h3>
-                    <p className="stat-value">{rewards?.points || 0}</p>
+                    <p className="stat-value">{fanProfile?.fanScore || rewards?.points || 0}</p>
                   </div>
                   <div className="stat-card">
                     <h3>NFTs</h3>
