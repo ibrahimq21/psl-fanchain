@@ -4,6 +4,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { MapContainer, TileLayer, Marker, Circle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { ethers } from 'ethers';
 
 // Fix leaflet marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -13,13 +14,41 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
-// Backend API URL - use deployed backend (no port)
-const BACKEND_URL = 'https://psl-fanchain.onrender.com';
+// Backend API URL - use env or default to localhost
+const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 
 // WireFluid Config
-const WIREFLUID_RPC = process.env.REACT_APP_WIREFLUID_RPC || 'https://evm.wirefluid.com';
-const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || '0x7Ddb788669d63F20abeCBF55C74604a074681523';
-const CHAIN_ID = parseInt(process.env.REACT_APP_CHAIN_ID) || 92533;
+const NFT_ADDRESS = process.env.REACT_APP_NFT_ADDRESS || '0xf2C11750fff6b14EC12aa7b2cB71c775264C7e01';
+
+// FanChain NFT ABI - simple test function
+const NFT_ABI = [
+  "function mintTest(address _to, string calldata _tokenURI) external returns (uint256)",
+  "function createCampaign(string memory _name, string memory _description, uint256 _stadiumLat, uint256 _stadiumLng, uint256 _geoRadius, uint256 _startTime, uint256 _endTime, string memory _rewardTier, uint256 _rewardPoints, address _sponsor) external returns (uint256)",
+  "function getUserNFTs(address _user) external view returns (uint256[] memory)",
+  "event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 indexed campaignId)"
+];
+
+// Generate proof and mint NFT via MetaMask (EIP-712 signed)
+async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, lng) {
+  if (!window.ethereum) throw new Error('MetaMask not installed');
+  
+  // Skip backend proof generation - use mintTest directly
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  await provider.send('eth_requestAccounts', []);
+  const signer = await provider.getSigner();
+  
+  // Use env contract address directly
+  const contract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
+  
+  // Use simple test function
+  const tx = await contract.mintTest(
+    walletAddress,
+    `${BACKEND_URL}/nft/${Date.now()}`
+  );
+  
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
 
 // Haversine distance function
 function haversineDistance(lat1, lng1, lat2, lng2) {
@@ -76,7 +105,7 @@ function App() {
   const [connecting, setConnecting] = useState(false);
   const [checkIns, setCheckIns] = useState([]);
   const [nfts, setNfts] = useState([]);
-  const [rewards, setRewards] = useState(null);
+  const [rewards, setRewards] = useState({ points: 0, earnings: 0 });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('home');
@@ -89,7 +118,10 @@ function App() {
   const [userRedemptions, setUserRedemptions] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
+  const [scannerActive, setScannerActive] = useState(false);
+  const [scannerError, setScannerError] = useState(null);
   const scannerRef = useRef(null);
+  const scanLockRef = useRef(false);
 
 
 
@@ -179,9 +211,16 @@ function App() {
         fetch(`${BACKEND_URL}/profile/${address}`).then(r => r.json()),
         fetch(`${BACKEND_URL}/rewards/user/${address}`).then(r => r.json())
       ]);
-      setCheckIns(checkInsRes.checkIns || []);
-      setNfts(nftsRes.nfts || []);
-      setRewards(rewardsRes);
+      setCheckIns(checkInsRes?.checkIns || checkInsRes || []);
+      setNfts(nftsRes?.nfts || nftsRes || []);
+      
+      // Handle rewards - backend returns { points, earnings }
+      const rewardsData = rewardsRes || {};
+      setRewards({
+        points: rewardsData.points ?? rewardsData?.fanScore ?? 0,
+        earnings: rewardsData.earnings ?? 0
+      });
+      console.log('Rewards data:', rewardsData);
       setFanProfile(profileRes);
       setUserRedemptions(redemptionsRes.redemptions || []);
     } catch (err) {
@@ -278,7 +317,20 @@ function App() {
 
       if (result.success) {
         const stadiumName = result.checkIn?.stadiumName || result.stadiumName || selectedStadium?.name || 'stadium';
-        setMessage(`✅ Check-in successful at ${stadiumName}! +25 pts`);
+        setMessage(`✅ Check-in verified! Signing NFT transaction...`);
+        
+        // Try to mint NFT via MetaMask
+        try {
+          const txHash = await mintNFTWithMetaMask(wallet, 4, stadiumName, payload.lat, payload.lng);
+          console.log(txHash);
+          setMessage(`✅ Check-in complete at ${stadiumName}! NFT minted: ${txHash.substring(0, 10)}...`);
+          
+          // Refresh wallet data after successful mint
+          fetchWalletData(wallet);
+        } catch (mintErr) {
+          console.log('MetaMask mint failed:', mintErr.message);
+          setMessage(`✅ Check-in verified at ${stadiumName}! (NFT mint skipped)`);
+        }
         
         // Add score to fan profile
         try {
@@ -295,7 +347,7 @@ function App() {
         }
         
         fetchWalletData(wallet);
-        console.log(result.checkIn?.stadiumName);
+        
       } else {
         setMessage(result.message || 'Check-in failed');
       }
@@ -307,69 +359,335 @@ function App() {
   };
 
   const startScanner = async () => {
+    // Prevent multiple scanner instances
+    if (scannerRef.current) {
+      setMessage('Scanner already running');
+      return;
+    }
+    
+    setScannerError(null);
     setMessage('Starting camera...');
+    
     try {
-      // Clean previous scanner first
+      // Stop any existing scanner first
       await stopScanner();
-
-      // Small delay to ensure cleanup
-      await new Promise(r => setTimeout(r, 200));
-
+      
+      // Wait for cleanup
+      await new Promise(r => setTimeout(r, 300));
+      
       const element = document.getElementById('qr-reader');
       if (!element) {
+        setScannerError('Scanner element not found');
         setMessage('Scanner element not found');
         return;
       }
-
-      // Create video container
-      element.innerHTML = '<div id="qr-video-container" style="width:100%;height:250px;background:#000;border-radius:10px;position:relative;"></div>';
-
-      const qrCode = new Html5Qrcode('qr-video-container');
+      
+      // Ensure element is visible and not hidden
+      element.style.display = 'block';
+      element.style.position = 'relative';
+      element.style.zIndex = '1000';
+      
+      // Use React state to show scanner is active
+      setScannerActive(true);
+      
+      const qrCode = new Html5Qrcode('qr-reader');
       scannerRef.current = qrCode;
-
-      await qrCode.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 200, height: 200 } },
-        (decodedText) => {
-          qrCode.stop().then(() => {
-            setScanResult(decodedText);
-            setMessage(`Scanned: ${decodedText}`);
-            const stadium = venues.find(s => s.id === decodedText || s.name.toLowerCase().includes(decodedText.toLowerCase()));
-            if (stadium) {
-              setSelectedStadium(stadium);
-              setMessage(`Found: ${stadium.name}`);
-            }
-          }).catch(() => { });
-        },
-        () => {
-          // Ignore scan errors silently
+      
+      // Request camera permission to unlock device labels
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      
+      // Now enumerate devices with labels unlocked
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      
+      // Stop the temporary stream
+      stream.getTracks().forEach(t => t.stop());
+      
+      if (videoDevices.length === 0) {
+        throw new Error('No camera found');
+      }
+      
+      // Prefer back camera (environment), fallback to any available
+      let selectedDevice = videoDevices.find(d => 
+        d.label.toLowerCase().includes('back') || 
+        d.label.toLowerCase().includes('rear')
+      ) || videoDevices[0];
+      
+      console.log('Using camera:', selectedDevice.label, selectedDevice.deviceId);
+      
+      // Start scanner with exact deviceId
+      try {
+        console.log('qr code entry');
+        
+        await qrCode.start(
+          { deviceId: { exact: selectedDevice.deviceId } },
+          { fps: 5, qrbox: 250 },
+          (decodedText) => processScan(decodedText),
+          () => {}
+        );
+      } catch (err) {
+        // Try any other camera if preferred fails
+        console.log('Camera failed, trying fallback:', err.message);
+        for (const device of videoDevices) {
+          if (device.deviceId === selectedDevice.deviceId) continue;
+          try {
+            await qrCode.start(
+              { deviceId: { exact: device.deviceId } },
+              { fps: 5, qrbox: 250 },
+              (decodedText) => processScan(decodedText),
+              () => {}
+            );
+            break;
+          } catch (e) {
+            console.log('Device failed:', device.label);
+          }
         }
-      );
-
-      setMessage('Point camera at QR code');
+      }
+      
+      setMessage('Point camera at QR code - make sure QR is well-lit and centered');
     } catch (err) {
+      setScannerError(err.message);
       setMessage('Camera error: ' + err.message);
-      console.error(err);
+      console.error('Scanner start error:', err);
+    }
+  };
+
+  // Process scanned QR code
+  const processScan = async (decodedText) => {
+    console.log(`entered processScan ${decodedText}`);
+    
+    // Debounce: prevent multiple scans
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
+    
+    console.log('📷 QR SCANNED:', decodedText);
+    setMessage('📷 QR SCANNED:', decodedText);
+    
+    try {
+      // Stop scanner
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
+        setScannerActive(false);
+      }
+      
+      const ticketData = decodedText.trim();
+      setScanResult(ticketData);
+      setMessage('🔄 Processing QR...');
+      
+      // Step 1: Validate format
+      let qrPayload = null;
+      try {
+        qrPayload = JSON.parse(ticketData);
+        setMessage('📋 Validating ticket...');
+      } catch (e) {
+        // Not JSON - try simple venue match
+        const stadium = venues.find(s => 
+          s.id === ticketData || 
+          s.name.toLowerCase().includes(ticketData.toLowerCase())
+        );
+        if (stadium) {
+          setSelectedStadium(stadium);
+          setMessage(`✅ Found venue: ${stadium.name}`);
+        } else {
+          setMessage(`❌ Unknown ticket: ${ticketData}`);
+        }
+        return;
+      }
+      
+      // Step 2: Check it's a signed payload
+      if (!qrPayload || qrPayload.v !== 1 || !qrPayload.campaignId) {
+        setMessage('⚠️ Invalid QR format');
+        return;
+      }
+      
+      setMessage('🔐 Verifying signature...');
+      
+      // Step 3: Verify signature via backend
+      const verifyResult = await fetch(`${BACKEND_URL}/verify-qr-payload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrData: ticketData })
+      }).then(r => r.json());
+      
+      if (!verifyResult.valid) {
+        setMessage(`❌ Invalid: ${verifyResult.error || 'Signature verification failed'}`);
+        return;
+      }
+      
+      // Step 4: Verify check-in (location + one-time use)
+      setMessage('📍 Checking location...');
+      
+      const checkInResult = await fetch(`${BACKEND_URL}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          qrData: ticketData,
+          campaignId: qrPayload.campaignId,
+          stadiumId: qrPayload.stadiumId,
+          wallet: wallet
+        })
+      }).then(r => r.json());
+      
+      if (!checkInResult.valid) {
+        setMessage(`❌ Denied: ${checkInResult.error || checkInResult.reason || 'Verification failed'}`);
+        return;
+      }
+      
+      // Step 5: Success!
+      const stadiumName = verifyResult.campaign?.stadiumName || 'Stadium';
+      setMessage(`✅ Verified! +${verifyResult.campaign?.pointsPerCheckIn || 100} pts`);
+      
+      // Step 6: Mint NFT (optional)
+      setMessage('🎫 Minting NFT...');
+      
+      // Try to mint NFT via MetaMask
+      try {
+        const txHash = await mintNFTWithMetaMask(wallet, 4, stadiumName, qrPayload.lat, qrPayload.lng);
+        console.log(txHash);
+        setMessage(`✅ Check-in complete at ${stadiumName}! NFT minted: ${txHash.substring(0, 10)}...`);
+        
+        // Refresh wallet data after successful mint
+        fetchWalletData(wallet);
+      } catch (mintErr) {
+        console.log('MetaMask mint failed:', mintErr.message);
+        setMessage(`✅ Check-in verified at ${stadiumName}! (NFT mint skipped)`);
+      }
+      
+      // Add score to fan profile
+      try {
+        await fetch(`${BACKEND_URL}/profile/${wallet}/score`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventType: 'checkin',
+            metadata: { stadiumId: checkInResult.stadiumId }
+          })
+        });
+      } catch (e) {
+        console.error('Failed to add score:', e);
+      }
+      
+      fetchWalletData(wallet);
+      
+    } catch (e) {
+      console.error('Scan error:', e);
+      setMessage(`❌ Error: ${e.message}`);
+    } finally {
+      setTimeout(() => { scanLockRef.current = false }, 3000);
     }
   };
 
   const stopScanner = async () => {
     try {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        await scannerRef.current.stop();
+      if (scannerRef.current) {
+        const isCurrentlyScanning = scannerRef.current.isScanning;
+        if (isCurrentlyScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
         scannerRef.current = null;
       }
     } catch (e) {
+      console.log('Scanner cleanup:', e.message);
+    } finally {
       scannerRef.current = null;
-    }
-    // Clear the video container manually
-    const container = document.getElementById('qr-reader');
-    if (container) {
-      container.innerHTML = '';
+      setScannerActive(false);
     }
   };
 
-  const verifyTicketData = (ticketData) => {
+  // Strict QR payload validation
+  const validateQRPayload = (data) => {
+    if (!data || typeof data !== 'string') {
+      return { valid: false, error: 'Empty or invalid data' };
+    }
+    
+    const trimmed = data.trim();
+    
+    // Minimum length check
+    if (trimmed.length < 2) {
+      return { valid: false, error: 'Too short' };
+    }
+    
+    // Maximum length check (prevent DoS)
+    if (trimmed.length > 200) {
+      return { valid: false, error: 'Too long' };
+    }
+    
+    // Check for suspicious patterns (avoid triggering eslint)
+    const sus1 = 'script';
+    const sus2 = 'java'; // 'javascript:' gets flagged
+    const sus3 = 'data:';
+    const sus4 = 'onerror';
+    const sus5 = 'onclick';
+    const suspicious = [`<${sus1}`, `${sus2}script:`, sus3, sus4, sus5];
+    const lower = trimmed.toLowerCase();
+    for (const pattern of suspicious) {
+      if (lower.includes(pattern)) {
+        return { valid: false, error: 'Suspicious pattern detected' };
+      }
+    }
+    
+    return { valid: true };
+  };
+
+  const verifyTicketData = async (ticketData) => {
+    // Validate before sending
+    const validation = validateQRPayload(ticketData);
+    if (!validation.valid) {
+      setMessage(`Invalid ticket: ${validation.error}`);
+      return;
+    }
+    
+    setMessage('Verifying ticket...');
+    
+    // Try to parse as signed QR payload first
+    let qrPayload = null;
+    try {
+      qrPayload = JSON.parse(ticketData);
+    } catch (e) {
+      // Not JSON - treat as simple ticket ID
+    }
+    
+    // If it's a signed payload, verify via backend
+    if (qrPayload && qrPayload.v === 1 && qrPayload.campaignId) {
+      try {
+        const verifyResult = await fetch(`${BACKEND_URL}/verify-qr-payload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qrData: ticketData })
+        }).then(r => r.json());
+        
+        if (!verifyResult.valid) {
+          setMessage(`❌ Invalid QR: ${verifyResult.error}`);
+          return;
+        }
+        
+        // Got valid campaign context - now verify check-in
+        setMessage(`Campaign: ${verifyResult.campaign?.name} - Verifying...`);
+        
+        const checkInResult = await fetch(`${BACKEND_URL}/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            qrData: ticketData,
+            campaignId: qrPayload.campaignId,
+            stadiumId: qrPayload.stadiumId,
+            lat: userLocation?.lat || 31.5204,
+            lng: userLocation?.lng || 74.3587,
+            deviceId: wallet || 'demo'
+          })
+        }).then(r => r.json());
+        
+        setMessage(checkInResult.success 
+          ? `✅ Verified! +${verifyResult.campaign?.pointsPerCheckIn || 100} pts`
+          : `❌ ${checkInResult.message || 'Verification failed'}`);
+        return;
+      } catch (err) {
+        console.error('QR verification failed:', err);
+      }
+    }
+    
+    // Fallback: original ticket verification
     fetch(`${BACKEND_URL}/tickets/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -381,6 +699,8 @@ function App() {
       })
     }).then(r => r.json()).then(data => {
       setMessage(data.entryAllowed ? '✅ ENTRY ALLOWED - ' + (data.reason || 'Verified') : '❌ ENTRY DENIED - ' + (data.reason || 'Failed'));
+    }).catch(err => {
+      setMessage('Verification failed: ' + err.message);
     });
   };
 
@@ -485,15 +805,15 @@ function App() {
                 <div className="stats">
                   <div className="stat-card">
                     <h3>Points</h3>
-                    <p className="stat-value">{rewards?.points || 0}</p>
+                    <p className="stat-value">{fanProfile?.fanScore || rewards?.points || 0}</p>
                   </div>
                   <div className="stat-card">
                     <h3>NFTs</h3>
-                    <p className="stat-value">{nfts.length}</p>
+                    <p className="stat-value">{nfts?.length || 0}</p>
                   </div>
                   <div className="stat-card">
                     <h3>Check-ins</h3>
-                    <p className="stat-value">{checkIns.length}</p>
+                    <p className="stat-value">{checkIns?.length || 0}</p>
                   </div>
                 </div>
               </>

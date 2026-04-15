@@ -60,8 +60,58 @@ contract FanChain is ERC721, Ownable {
     event NFTMinted(uint256 indexed tokenId, address indexed owner, uint256 campaignId);
     event EarningsClaimed(address indexed influencer, uint256 amount);
 
+    // EIP-712 Domain Separator
+    bytes32 public DOMAIN_SEPARATOR;
+    string constant DOMAIN_NAME = "PSL FanChain";
+    string constant DOMAIN_VERSION = "1";
+
+    // Verification struct for signed minting
+    struct CheckInProof {
+        address user;
+        uint256 campaignId;
+        uint256 lat;
+        uint256 lng;
+        uint256 timestamp;
+        uint256 nonce;
+        uint256 expiry;
+    }
+
+    // Hash for verification
+    bytes32 public constant CHECKIN_TYPEHASH = keccak256(
+        "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce,uint256 expiry)"
+    );
+
+    // Mapping of used nonces (one-time use)
+    mapping(bytes32 => bool) public usedProofs;
+    
+    // Track if user already minted for campaign
+    mapping(address => mapping(uint256 => bool)) public hasMintedCampaign;
+
     constructor(address _platformWallet) ERC721("PSL FanChain", "PSLF") {
         platformWallet = _platformWallet;
+        
+        // Initialize EIP-712 domain separator
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(DOMAIN_NAME)),
+                keccak256(bytes(DOMAIN_VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
+    }
+
+    // Simple test function - mint without signature
+    // TESTING VERSION
+    function mintTest(address _to, string calldata _tokenURI) external returns (uint256) {
+        uint256 newTokenId = _tokenIds.current();
+        _mint(_to, newTokenId);
+        _setTokenURI(newTokenId, _tokenURI);
+        
+        emit NFTMinted(newTokenId, _to, 0);
+        _tokenIds.increment();
+        return newTokenId;
     }
 
     // Create new campaign

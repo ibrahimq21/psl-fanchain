@@ -5,19 +5,37 @@
  * a consistent interface for all services.
  * 
  * Usage:
- *   const { getVenues, getVenueById, getStadiumOptions } = require('./shared/venues');
+ *   const { getVenues, getVenueByKey, getStadiumOptions } = require('./shared/venues');
  */
 
 const fs = require('fs');
 const path = require('path');
 
-// Load venues from JSON
-const venuesPath = path.join(__dirname, '..', 'venues', 'venues.json');
+// Load venues from JSON - use process.cwd() for Render
 let venues = {};
 
 try {
-  const venuesData = JSON.parse(fs.readFileSync(venuesPath, 'utf8'));
-  venues = venuesData;
+  // Try multiple locations for venues.json
+  const possiblePaths = [
+    path.join(process.cwd(), 'venues', 'venues.json'),
+    path.join(process.cwd(), '..', 'venues', 'venues.json'),
+    path.join(__dirname, 'venues', 'venues.json'),
+  ];
+  
+  let venuesPath = '';
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      venuesPath = p;
+      break;
+    }
+  }
+  
+  if (venuesPath) {
+    const venuesData = JSON.parse(fs.readFileSync(venuesPath, 'utf8'));
+    venues = venuesData;
+  } else {
+    console.error('venues.json not found in any location');
+  }
 } catch (err) {
   console.error('Failed to load venues.json:', err.message);
 }
@@ -46,7 +64,7 @@ function getVenueByKey(key) {
  */
 function getVenuesByCity(city) {
   return Object.entries(venues)
-    .filter(([_, v]) => v.city.toLowerCase() === city.toLowerCase())
+    .filter(([, v]) => v.city && v.city.toLowerCase() === city.toLowerCase())
     .map(([key, v]) => ({ id: key, ...v }));
 }
 
@@ -56,7 +74,7 @@ function getVenuesByCity(city) {
  */
 function getStadiums() {
   return Object.entries(venues)
-    .filter(([_, v]) => !v.isEvent)
+    .filter(([, v]) => !v.isEvent)
     .map(([key, v]) => ({ id: key, ...v }));
 }
 
@@ -66,7 +84,7 @@ function getStadiums() {
  */
 function getEvents() {
   return Object.entries(venues)
-    .filter(([[key, v]]) => v.isEvent)
+    .filter(([, v]) => v.isEvent)
     .map(([key, v]) => ({ id: key, ...v }));
 }
 
@@ -107,8 +125,8 @@ function isValidVenue(key) {
  */
 function getCoordinates(key) {
   const venue = venues[key];
-  if (!venue || !venue.coordinates) return null;
-  return venue.coordinates;
+  if (!venue) return null;
+  return { lat: venue.lat, lng: venue.lng };
 }
 
 module.exports = {

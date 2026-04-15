@@ -1,16 +1,17 @@
-require("dotenv").config({ path: './blockchain/.env' });
-require("@nomicfoundation/hardhat-toolbox");
+import dotenv from "dotenv";
+import "@nomicfoundation/hardhat-toolbox";
+
+dotenv.config({ path: './blockchain/.env' });
 
 /** @type import('hardhat/config').HardhatUserConfig */
-module.exports = {
+export default {
   solidity: {
     version: "0.8.19",
     settings: {
       optimizer: {
         enabled: true,
         runs: 200
-      },
-      viaIR: true
+      }
     }
   },
   networks: {

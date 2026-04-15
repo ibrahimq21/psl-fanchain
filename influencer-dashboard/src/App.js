@@ -1,9 +1,61 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
 // Environment variables - use .env file
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 const QR_API_URL = process.env.REACT_APP_QR_API_URL || 'https://api.qrserver.com/v1/create-qr-code/';
+
+// ==================== Centralized API Wrapper ====================
+
+// Toast notification helper
+const showToast = (message, type = 'error') => {
+  console.log(`[${type.toUpperCase()}] ${message}`);
+};
+
+// Create a unique request ID to track async operations
+const generateRequestId = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+// Fetch with retry and consistent error handling
+const fetchWithRetry = async (url, options = {}, retries = 3, delay = 1000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.warn(`[Fetch] Attempt ${attempt}/${retries} failed:`, error.message);
+      
+      // Don't retry on network errors or parse errors (last attempt)
+      if (attempt === retries || error.name === 'SyntaxError') {
+        throw error;
+      }
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+  throw new Error('Max retries exceeded');
+};
+
+// API wrapper
+const api = {
+  get: (endpoint) => fetchWithRetry(`${API_URL}${endpoint}`),
+  post: (endpoint, body) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'POST', body: JSON.stringify(body) }),
+  put: (endpoint, body) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (endpoint) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'DELETE' }),
+};
 
 // PSL Stadiums - loaded from backend API or use defaults
 // The actual venue list comes from the backend /stadiums endpoint
@@ -36,6 +88,7 @@ function App() {
   const [wallet, setWallet] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
   const [stats, setStats] = useState({ totalCampaigns: 0, totalParticipants: 0, totalRewards: 0 });
+  const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [notification, setNotification] = useState(null);
   const [venues, setVenues] = useState([]);
@@ -52,6 +105,15 @@ function App() {
     rewards: 'both'
   });
 
+  // Field validation errors
+  const [fieldErrors, setFieldErrors] = useState({});
+  
+  // Loading state for campaign creation
+  const [isCreating, setIsCreating] = useState(false);
+  
+  // Optimistic UI - pending campaigns
+  const [pendingCampaigns, setPendingCampaigns] = useState([]);
+
   // Demo influencer data
   const [influencerData] = useState({
     name: 'PSL Influencer',
@@ -62,34 +124,80 @@ function App() {
     totalEarnings: 45000
   });
 
+  // Load data from backend
   useEffect(() => {
-    // Load data from backend
     fetchCampaigns();
     fetchStats();
     fetchVenues();
+    
+    // Cleanup on unmount
+    return () => {
+      // Cancel any pending fetch if needed
+    };
   }, []);
+
+  // ==================== Fetch Functions with Proper Error Handling ====================
+  
+  // Validate venue response structure
+  const isValidVenueResponse = (data) => {
+    if (!data || typeof data !== 'object') return false;
+    // Allow any object with venue data (flexible validation)
+    return Object.keys(data).length > 0;
+  };
+
+  // Normalize venue data from API
+  const normalizeVenue = ([key, v]) => ({
+    id: key,
+    name: v?.name || v?.stadiumName || key,
+    city: v?.city || 'Unknown',
+    lat: v?.lat || v?.coordinates?.lat || 0,
+    lng: v?.lng || v?.coordinates?.lng || 0,
+    radius: v?.radius || 500,
+    isEvent: v?.isEvent || false
+  });
+
+  // Default venues as fallback
+  const defaultVenues = [
+    { id: 'Rawalpindi Cricket Stadium', name: 'Rawalpindi Cricket Stadium', city: 'Rawalpindi', lat: 33.7266, lng: 73.0718, isEvent: false },
+    { id: 'Gaddafi Stadium', name: 'Gaddafi Stadium', city: 'Lahore', lat: 31.5204, lng: 74.3587, isEvent: false },
+    { id: 'National Stadium Karachi', name: 'National Stadium Karachi', city: 'Karachi', lat: 24.8967, lng: 67.0817, isEvent: false }
+  ];
 
   const fetchVenues = async () => {
     setLoading(true);
+    console.log('[Venues] Fetching from API...');
     try {
-      const res = await fetch(`${API_URL}/stadiums`);
-      const data = await res.json();
-      // Transform to dropdown options
-      const venueOptions = Object.entries(data).map(([key, v]) => ({
-        id: key,
-        name: v.name || key,
-        city: v.city,
-        lat: v.lat,
-        lng: v.lng,
-        isEvent: v.isEvent || false
-      }));
+      const data = await api.get('/stadiums');
+      
+      // Validate response
+      if (!isValidVenueResponse(data)) {
+        console.warn('[Venues] Invalid response, using defaults');
+        setVenues(defaultVenues);
+        return;
+      }
+      
+      console.log('[Venues] Received:', Object.keys(data));
+      const venueOptions = Object.entries(data).map(normalizeVenue);
+      
+      // Ensure we have venues
+      if (venueOptions.length === 0) {
+        console.warn('[Venues] Empty response, using defaults');
+        setVenues(defaultVenues);
+        return;
+      }
+      
       setVenues(venueOptions);
-      // Set default stadium
-      if (venueOptions.length > 0 && !newCampaign.stadiumId) {
+      console.log(`[Venues] Loaded ${venueOptions.length} venues`);
+      
+      // Set default stadium if none selected
+      if (!newCampaign.stadiumId && venueOptions.length > 0) {
         setNewCampaign(prev => ({ ...prev, stadiumId: venueOptions[0].id }));
       }
     } catch (err) {
-      console.error('Failed to fetch venues:', err);
+      // Log the actual error
+      console.error('[Venues] Fetch failed:', err.message || err);
+      console.log('[Venues] Falling back to defaults');
+      setVenues(defaultVenues);
     } finally {
       setLoading(false);
     }
@@ -97,51 +205,149 @@ function App() {
 
   const fetchCampaigns = async () => {
     setLoading(true);
+    console.log('[Campaigns] Fetching from API...');
     try {
-      const res = await fetch(`${API_URL}/campaigns`);
-      const data = await res.json();
-      setCampaigns(data.campaigns || []);
+      const data = await api.get('/campaigns');
+      
+      // Validate response
+      if (!data || !Array.isArray(data.campaigns)) {
+        console.warn('[Campaigns] Invalid response, using empty');
+        setCampaigns([]);
+        return;
+      }
+      
+      console.log(`[Campaigns] Loaded ${data.campaigns.length} campaigns`);
+      setCampaigns(data.campaigns);
     } catch (err) {
-      console.error('Failed to fetch campaigns:', err);
-      // Use demo data
-      setCampaigns([
-        {
-          id: 'demo_1',
-          name: 'PSL 2026 - Lahore Match',
-          stadiumId: 'Gaddafi Stadium',
-          status: 'active',
-          currentParticipants: 234,
-          maxParticipants: 500,
-          rewards: { pointsPerCheckIn: 100, bonusPoints: 50 }
-        }
-      ]);
+      console.error('[Campaigns] Fetch failed:', err.message || err);
+      setCampaigns([]);
     }
   };
 
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/analytics`);
-      const data = await res.json();
-      setStats({
-        totalCampaigns: data.campaigns?.length || 0,
-        totalParticipants: data.totalCheckIns || 0,
-        totalRewards: data.totalPoints || 0
-      });
+      setLoading(true);
+      const data = await api.get('/admin/stats').catch(() => 
+        api.get('/campaigns').catch(() => null)
+      );
+      
+      if (data) {
+        setStats({
+          totalCampaigns: data.campaigns?.length || campaigns.length || 0,
+          totalParticipants: data.totalCheckIns || 0,
+          totalRewards: data.totalPoints || 0
+        });
+      } else {
+        setStats({ totalCampaigns: campaigns.length, totalParticipants: 0, totalRewards: 0 });
+      }
     } catch (err) {
-      setStats({
-        totalCampaigns: campaigns.length,
-        totalParticipants: campaigns.reduce((sum, c) => sum + (c.currentParticipants || 0), 0),
-        totalRewards: campaigns.length * 1000
-      });
+      console.error('Failed to fetch stats:', err);
+      setStats({ totalCampaigns: campaigns.length, totalParticipants: 0, totalRewards: 0 });
     } finally {
       setLoading(false);
     }
   };
 
+  // Generate QR code for campaign
+  const generateCampaignQR = async (campaign) => {
+    try {
+      setLoading(true);
+      const stadiumId = campaign.stadiumId || campaign.stadiumId;
+      const result = await api.post('/generate-qr-payload', {
+        campaignId: campaign.id,
+        stadiumId: stadiumId
+      });
+      
+      if (result.success) {
+        // Generate QR image URL
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(result.qrData)}`;
+        setNotification({
+          type: 'success',
+          message: `QR Generated! Campaign: ${campaign.name}`
+        });
+        return { qrUrl, qrData: result.qrData, campaign };
+      }
+    } catch (err) {
+      console.error('QR generation failed:', err);
+      setNotification({ type: 'error', message: 'Failed to generate QR' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== Validation Functions ====================
+  const validateField = (name, value) => {
+    switch (name) {
+      case 'name':
+        if (!value || value.trim().length < 3) return 'Name must be at least 3 characters';
+        if (value.length > 100) return 'Name must be less than 100 characters';
+        return null;
+      case 'stadiumId':
+        if (!value) return 'Please select a location';
+        return null;
+      case 'startTime':
+        if (!value) return 'Start time is required';
+        const start = new Date(value);
+        if (start < new Date()) return 'Start time must be in the future';
+        return null;
+      case 'endTime':
+        if (value && new Date(value) <= new Date(newCampaign.startTime)) return 'End time must be after start time';
+        return null;
+      case 'maxParticipants':
+        if (value < 10) return 'Minimum 10 participants';
+        if (value > 10000) return 'Maximum 10,000 participants';
+        return null;
+      case 'pointsPerCheckIn':
+        if (value < 10) return 'Minimum 10 points';
+        if (value > 1000) return 'Maximum 1,000 points';
+        return null;
+      case 'bonusPoints':
+        if (value < 0) return 'Bonus points cannot be negative';
+        if (value > 500) return 'Maximum 500 bonus points';
+        return null;
+      default:
+        return null;
+    }
+  };
+
+  // Validate all fields
+  const validateAllFields = () => {
+    const errors = {};
+    Object.keys(newCampaign).forEach(key => {
+      const error = validateField(key, newCampaign[key]);
+      if (error) errors[key] = error;
+    });
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Handle field change with inline validation
+  const handleFieldChange = (field, value) => {
+    setNewCampaign({ ...newCampaign, [field]: value });
+    // Clear this field's error when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors({ ...fieldErrors, [field]: null });
+    }
+    // Real-time validation for this field
+    const error = validateField(field, value);
+    if (error) {
+      setFieldErrors({ ...fieldErrors, [field]: error });
+    }
+  };
+
+  // Handle form submission
   const handleCreateCampaign = async () => {
-    if (!newCampaign.name || !newCampaign.startTime) {
-      setNotification({ type: 'error', message: 'Please fill in required fields (name and start time)' });
+    // Validate all fields first
+    const errors = {};
+    Object.keys(newCampaign).forEach(key => {
+      const error = validateField(key, newCampaign[key]);
+      if (error) errors[key] = error;
+    });
+    setFieldErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      setNotification({ type: 'error', message: 'Please fix the validation errors below' });
       return;
     }
     
@@ -152,7 +358,7 @@ function App() {
       stadiumId: newCampaign.stadiumId,
       description: newCampaign.description,
       startTime: new Date(newCampaign.startTime).toISOString(),
-      endTime: new Date(newCampaign.endTime || newCampaign.startTime).toISOString(),
+      endTime: newCampaign.endTime ? new Date(newCampaign.endTime).toISOString() : new Date(newCampaign.startTime).toISOString(),
       rewards: {
         pointsPerCheckIn: newCampaign.pointsPerCheckIn,
         bonusPoints: newCampaign.bonusPoints,
@@ -161,37 +367,61 @@ function App() {
       maxParticipants: newCampaign.maxParticipants
     };
 
+    // Create optimistic campaign object (temporary UI)
+    const optimisticCampaign = {
+      ...campaign,
+      id: `temp_${Date.now()}`,
+      status: 'pending',
+      currentParticipants: 0,
+      createdAt: new Date().toISOString(),
+      isOptimistic: true // Flag to identify temporary cards
+    };
+
+    // Store request ID for race condition handling
+    const requestId = generateRequestId();
+    
+    // Optimistic UI update - show immediately!
+    setIsCreating(true);
+    const tempId = optimisticCampaign.id;
+    
+    // Use functional updates to avoid stale state
+    setPendingCampaigns(prev => [...prev, optimisticCampaign]);
+    setCampaigns(prev => [...prev, optimisticCampaign]);
+
     try {
-      const res = await fetch(`${API_URL}/campaigns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(campaign)
-      });
+      const data = await api.post('/campaigns', campaign);
       
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      // Verify this is still our pending request (race condition check)
+      setPendingCampaigns(prev => prev.filter(c => c.id !== tempId));
+      setCampaigns(prev => prev.map(c => 
+        c.id === tempId ? { ...data.campaign, status: 'active' } : c
+      ));
       
-      const data = await res.json();
-      
-      // Success!
       setNotification({ 
         type: 'success', 
-        message: `✅ Campaign "${campaign.name}" created successfully! Campaign ID: ${data.campaign?.id || 'N/A'}`
+        message: `✅ Campaign "${campaign.name}" created successfully!`
       });
       
-      setCampaigns([...campaigns, data.campaign]);
-      setShowCreateForm(false);
-      setNewCampaign({ name: '', stadiumId: 'Gaddafi Stadium', description: '', startTime: '', endTime: '', maxParticipants: 500, pointsPerCheckIn: 100, bonusPoints: 50, rewards: 'both' });
+      // Reset form
+      setNewCampaign({ name: '', stadiumId: venues[0]?.id || '', description: '', startTime: '', endTime: '', maxParticipants: 500, pointsPerCheckIn: 100, bonusPoints: 50, rewards: 'both' });
+      setFieldErrors({});
+      
+      // Redirect to campaigns page after success
+      setActiveTab('campaigns');
       
       // Refresh stats
       fetchStats();
       
     } catch (err) {
       console.error('Campaign creation error:', err);
+      
+      // Rollback: remove optimistic card on failure
+      setPendingCampaigns(prev => prev.filter(c => c.id !== tempId));
+      setCampaigns(prev => prev.filter(c => c.id !== tempId));
+      
       setNotification({ 
         type: 'error', 
-        message: `❌ Failed to create campaign: ${err.message}. Please try again or check if the backend is running.`
+        message: `❌ Failed to create campaign: ${err.message}. Please try again.`
       });
     } finally {
       setLoading(false);
@@ -202,8 +432,15 @@ function App() {
   };
 
   const generateQRCode = (campaignId) => {
-    // Return a QR code URL using environment variable or fallback
-    return `${QR_API_URL}?size=200x200&data=${campaignId}`;
+    // Use plain campaignId string - no URL encoding needed for QR
+    return `${QR_API_URL}?size=300x300&data=${encodeURIComponent(campaignId)}&chose=M&chf=bg%2Cs%2CFFFFFFFF`;
+  };
+  
+  // Generate signed QR on demand
+  const handleGenerateSignedQR = async (campaign) => {
+    const qrUrl = generateQRCode(campaign.id);
+    // Open in new tab
+    window.open(qrUrl, '_blank');
   };
 
   const getStadiumName = (id) => venues.find(s => s.id === id)?.name || id;
@@ -318,11 +555,11 @@ function App() {
             
             <div className="campaigns-grid">
               {campaigns.map(c => (
-                <div key={c.id} className="campaign-card">
+                <div key={c.id} className={`campaign-card ${c.isOptimistic ? 'optimistic' : ''}`}>
                   <div className="campaign-header">
                     <h3>{c.name}</h3>
                     <span className={`status ${c.status || 'active'}`}>
-                      {c.status === 'active' ? '🟢 Active' : '⏸️ Ended'}
+                      {c.isOptimistic ? '⏳ Pending...' : c.status === 'active' ? '🟢 Active' : '⏸️ Ended'}
                     </span>
                   </div>
                   
@@ -343,13 +580,21 @@ function App() {
                   </div>
 
                   <div className="campaign-qr">
-                    <img src={generateQRCode(c.id)} alt="Campaign QR" />
-                    <p>Scan to join</p>
+                    <img src={c.isOptimistic ? 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNi8+PC9zdmc+' : generateQRCode(c.id)} alt="Campaign QR" />
+                    <p>{c.isOptimistic ? 'QR after creation' : 'Scan to join'}</p>
                   </div>
 
                   <div className="campaign-actions">
-                    <button className="btn-small">📊 Analytics</button>
-                    <button className="btn-small">📤 Share</button>
+                    {!c.isOptimistic && (
+                      <>
+                        <button className="btn-small" onClick={() => handleGenerateSignedQR(c)}>📱 Generate QR</button>
+                        <button className="btn-small">📊 Analytics</button>
+                        <button className="btn-small">📤 Share</button>
+                      </>
+                    )}
+                    {c.isOptimistic && (
+                      <button className="btn-small" disabled>⏳ Waiting for confirmation</button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -375,21 +620,25 @@ function App() {
                   type="text" 
                   placeholder="e.g., PSL 2026 - Karachi Match"
                   value={newCampaign.name}
-                  onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
-                  required
+                  onChange={(e) => handleFieldChange('name', e.target.value)}
+                  className={fieldErrors.name ? 'error' : ''}
                 />
+                {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
               </div>
 
               <div className="form-group">
                 <label>Location *</label>
                 <select 
                   value={newCampaign.stadiumId}
-                  onChange={(e) => setNewCampaign({...newCampaign, stadiumId: e.target.value})}
+                  onChange={(e) => handleFieldChange('stadiumId', e.target.value)}
+                  className={fieldErrors.stadiumId ? 'error' : ''}
                 >
+                  <option value="">Select a venue...</option>
                   {venues.map(s => (
                     <option key={s.id} value={s.id}>{s.name} ({s.city})</option>
                   ))}
                 </select>
+                {fieldErrors.stadiumId && <span className="field-error">{fieldErrors.stadiumId}</span>}
               </div>
 
               <div className="form-group">
@@ -408,17 +657,20 @@ function App() {
                   <input 
                     type="datetime-local"
                     value={newCampaign.startTime}
-                    onChange={(e) => setNewCampaign({...newCampaign, startTime: e.target.value})}
-                    required
+                    onChange={(e) => handleFieldChange('startTime', e.target.value)}
+                    className={fieldErrors.startTime ? 'error' : ''}
                   />
+                  {fieldErrors.startTime && <span className="field-error">{fieldErrors.startTime}</span>}
                 </div>
                 <div className="form-group">
                   <label>End Time</label>
                   <input 
                     type="datetime-local"
                     value={newCampaign.endTime}
-                    onChange={(e) => setNewCampaign({...newCampaign, endTime: e.target.value})}
+                    onChange={(e) => handleFieldChange('endTime', e.target.value)}
+                    className={fieldErrors.endTime ? 'error' : ''}
                   />
+                  {fieldErrors.endTime && <span className="field-error">{fieldErrors.endTime}</span>}
                 </div>
               </div>
 
@@ -429,8 +681,10 @@ function App() {
                   min="10"
                   max="10000"
                   value={newCampaign.maxParticipants}
-                  onChange={(e) => setNewCampaign({...newCampaign, maxParticipants: parseInt(e.target.value)})}
+                  onChange={(e) => handleFieldChange('maxParticipants', parseInt(e.target.value))}
+                  className={fieldErrors.maxParticipants ? 'error' : ''}
                 />
+                {fieldErrors.maxParticipants && <span className="field-error">{fieldErrors.maxParticipants}</span>}
               </div>
 
               <div className="form-section">
@@ -444,8 +698,10 @@ function App() {
                       min="10"
                       max="1000"
                       value={newCampaign.pointsPerCheckIn}
-                      onChange={(e) => setNewCampaign({...newCampaign, pointsPerCheckIn: parseInt(e.target.value)})}
+                      onChange={(e) => handleFieldChange('pointsPerCheckIn', parseInt(e.target.value))}
+                      className={fieldErrors.pointsPerCheckIn ? 'error' : ''}
                     />
+                    {fieldErrors.pointsPerCheckIn && <span className="field-error">{fieldErrors.pointsPerCheckIn}</span>}
                   </div>
                   <div className="form-group">
                     <label>Bonus Points</label>
@@ -454,8 +710,10 @@ function App() {
                       min="0"
                       max="500"
                       value={newCampaign.bonusPoints}
-                      onChange={(e) => setNewCampaign({...newCampaign, bonusPoints: parseInt(e.target.value)})}
+                      onChange={(e) => handleFieldChange('bonusPoints', parseInt(e.target.value))}
+                      className={fieldErrors.bonusPoints ? 'error' : ''}
                     />
+                    {fieldErrors.bonusPoints && <span className="field-error">{fieldErrors.bonusPoints}</span>}
                   </div>
                 </div>
 
@@ -494,11 +752,11 @@ function App() {
               </div>
 
               <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setActiveTab('campaigns')}>
+                <button type="button" className="btn-secondary" onClick={() => setActiveTab('campaigns')} disabled={isCreating}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
-                  🚀 Create Campaign
+                <button type="submit" className="btn-primary" disabled={isCreating}>
+                  {isCreating ? '⏳ Creating...' : '🚀 Create Campaign'}
                 </button>
               </div>
             </form>

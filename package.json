@@ -1,7 +1,8 @@
 {
   "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
     "@truffle/hdwallet-provider": "^2.1.15",
-    "hardhat": "^3.3.0"
+    "hardhat": "^2.28.6"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.6",

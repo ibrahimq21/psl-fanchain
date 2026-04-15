@@ -1,6 +1,6 @@
 /**
  * PSL FanChain Backend - Extended Campaign System
- * 
+ *
  * Features:
  * - Campaign Management (create, join, track)
  * - Multi-layer Anti-Spoof Validation
@@ -52,26 +52,26 @@ async function initWeb3() {
   try {
     const fs = require('fs');
     const path = require('path');
-    
+
     // Try to load contract ABI
     const artifactPath = path.join(__dirname, '../build/contracts/FanChain.json');
     if (!fs.existsSync(artifactPath)) {
       console.log('⚠️ Contract ABI not found - blockchain features disabled');
       return;
     }
-    
+
     const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
     FAN_CHAIN_ABI = artifact.abi;
-    
+
     const Web3 = require('web3');
     web3 = new Web3(process.env.WIREFLUID_RPC || 'https://evm.wirefluid.com');
-    
+
     const contractAddress = process.env.CONTRACT_ADDRESS;
     fanChainContract = new web3.eth.Contract(FAN_CHAIN_ABI, contractAddress);
-    
+
     console.log('🔗 Web3 connected to WireFluid');
     console.log('📄 Contract:', contractAddress);
-    
+
     // Test connection
     const blockNumber = await web3.eth.getBlockNumber();
     console.log('📊 Current block:', blockNumber);
@@ -89,21 +89,21 @@ initWeb3();
  */
 async function mintNFTOnChain(walletAddress, campaignId, stadiumId, stadiumName, lat, lng) {
   const privateKey = process.env.PRIVATE_KEY;
-  
+
   // If no private key, throw error (no more mock)
   if (!privateKey) {
     throw new Error('PRIVATE_KEY not configured - NFT minting unavailable');
   }
-  
+
   // Use child process to call external mint script (avoids web3 compatibility issues)
   const { exec } = require('child_process');
   const scriptPath = path.join(__dirname, 'scripts', 'mint-nft.js');
-  
+
   console.log('🔄 Attempting blockchain mint...');
-  
+
   // Run the mint script - throw error on failure (no fallback)
   const mintPromise = new Promise((resolve, reject) => {
-    exec(`node "${scriptPath}" "${process.env.PRIVATE_KEY}" "${walletAddress}" 4`, 
+    exec(`node "${scriptPath}" "${process.env.PRIVATE_KEY}" "${walletAddress}" 4`,
       { cwd: path.join(__dirname) },
       (error, stdout, stderr) => {
         if (error) {
@@ -119,10 +119,10 @@ async function mintNFTOnChain(walletAddress, campaignId, stadiumId, stadiumName,
       }
     );
   });
-  
+
   const txHash = await mintPromise;
   console.log('✅ REAL NFT Minted:', txHash);
-  
+
   return {
     success: true,
     transactionHash: txHash,
@@ -139,7 +139,7 @@ async function mintNFTOnChain(walletAddress, campaignId, stadiumId, stadiumName,
 
 const CONFIG = {
   secretKey: process.env.SECRET_KEY || 'psl-fanchain-secret-key-2026',
-  
+
   // WireFluid blockchain config
   blockchain: {
     rpc: process.env.WIREFLUID_RPC || 'https://evm.wirefluid.com',
@@ -148,7 +148,7 @@ const CONFIG = {
     currency: process.env.WIREFLUID_CURRENCY || 'WIRE',
     contractAddress: process.env.CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000001'
   },
-  
+
   // Rewards config
   rewards: {
     basePoints: parseInt(process.env.REWARDS_BASE_POINTS) || 10,
@@ -156,10 +156,10 @@ const CONFIG = {
     stadiumBonus: parseInt(process.env.REWARDS_STADIUM_BONUS) || 20,
     nftMintThreshold: parseInt(process.env.REWARDS_NFT_MINT_THRESHOLD) || 50
   },
-  
+
   // Load stadiums from shared venues module
   stadiums: getVenues(),
-  
+
   geo: {
     maxAgeSeconds: 60,
     maxFutureSeconds: 10,
@@ -168,7 +168,7 @@ const CONFIG = {
     selfieRequired: true,
     challengeRequired: false
   },
-  
+
   risk: {
     mockLocationPenalty: 50,
     emulatorPenalty: 40,
@@ -204,7 +204,7 @@ function generateTicketQR(eventId, userId, options = {}) {
     .createHmac('sha256', CONFIG.secretKey)
     .update(`${ticketId}:${eventId}:${userId}`)
     .digest('hex');
-  
+
   const ticket = {
     ticketId,
     eventId,
@@ -220,7 +220,7 @@ function generateTicketQR(eventId, userId, options = {}) {
     maxTransfers: 1,
     qrData: `${ticketId}|${eventId}|${signature.substring(0, 16)}`
   };
-  
+
   ticketStore.set(ticketId, ticket);
   return ticket;
 }
@@ -230,46 +230,46 @@ function verifyTicket(qrData, userLat, userLng, timestamp) {
   try {
     const [ticketId, eventId, signature] = qrData.split('|');
     const ticket = ticketStore.get(ticketId);
-    
+
     if (!ticket) {
       return { valid: false, reason: 'Invalid ticket - not found' };
     }
-    
+
     // Check if already used (one-time use)
     if (ticket.status === 'used') {
       return { valid: false, reason: 'Ticket already used', usedAt: ticket.usedAt };
     }
-    
+
     // Verify signature using originalOwner (signature is tied to original buyer)
     const expectedSig = crypto
       .createHmac('sha256', CONFIG.secretKey)
       .update(`${ticketId}:${eventId}:${ticket.originalOwner}`)
       .digest('hex')
       .substring(0, 16);
-    
+
     if (signature !== expectedSig) {
       return { valid: false, reason: 'Invalid ticket signature' };
     }
-    
+
     // Get event location
     const venue = CONFIG.stadiums[eventId] || CONFIG.stadiums['Gaddafi Stadium'];
-    
+
     // Validate location
     const distance = haversineDistance(userLat, userLng, venue.lat, venue.lng);
     const inGeoFence = distance <= (venue.radius || 500);
-    
+
     // Calculate time validation
     const now = new Date();
     const timeValid = true; // For demo, always valid
-    
+
     // Calculate risk score
     let riskScore = 0;
     if (!inGeoFence) riskScore += 50;
     if (distance > 1000) riskScore += 30;
-    
+
     return {
       valid: riskScore < 80 && inGeoFence,
-      reason: riskScore < 80 && inGeoFence ? 'Verified' : 
+      reason: riskScore < 80 && inGeoFence ? 'Verified' :
              !inGeoFence ? 'Not at venue' : 'Risk too high',
       ticket,
       venue,
@@ -293,7 +293,7 @@ function initializeSampleTickets() {
         generateTicketQR(venue.id, `user_${i}`);
       }
     });
-  
+
   console.log(`   Sample tickets initialized for ${Object.values(CONFIG.stadiums).filter(v => v.isEvent).length} events`);
 }
 
@@ -358,7 +358,7 @@ function generateProofHash(checkIn) {
 function evaluateRisk(data) {
   let riskScore = 0;
   const signals = [];
-  
+
   if (data.isMockLocation) {
     riskScore += CONFIG.risk.mockLocationPenalty;
     signals.push('mock_location');
@@ -387,7 +387,7 @@ function evaluateRisk(data) {
     riskScore += CONFIG.risk.attestationPenalty;
     signals.push('attestation_failed');
   }
-  
+
   return {
     score: riskScore,
     signals,
@@ -433,15 +433,15 @@ function mintNFT(wallet, campaign) {
       date: campaign.startTime
     }
   };
-  
+
   const walletData = getOrCreateWallet(wallet);
   walletData.nfts.push(nft);
   walletData.points += campaign.rewards.pointsPerCheckIn;
-  
+
   if (campaign.rewards.nftReward) {
     walletData.earnings += 1;
   }
-  
+
   return nft;
 }
 
@@ -493,11 +493,11 @@ app.get('/campaigns/:id', (req, res) => {
 // Create campaign (admin)
 app.post('/campaigns', (req, res) => {
   const { name, stadiumId, description, startTime, endTime, rewards, maxParticipants } = req.body;
-  
+
   if (!name || !stadiumId || !CONFIG.stadiums[stadiumId]) {
     return res.status(400).json({ error: 'Invalid name or stadiumId' });
   }
-  
+
   const id = `campaign_${stadiumId}_${Date.now()}`;
   const campaign = {
     id,
@@ -512,32 +512,137 @@ app.post('/campaigns', (req, res) => {
     currentParticipants: 0,
     createdAt: new Date().toISOString()
   };
-  
+
   campaignStore.set(id, campaign);
   res.json({ campaign, message: 'Campaign created' });
+});
+
+// ==================== QR PAYLOAD SIGNING ====================
+
+// Generate signed QR payload for campaign
+function generateSignedQRPayload(campaignId, stadiumId) {
+  const payload = {
+    v: 1, // version
+    campaignId,
+    stadiumId,
+    timestamp: Date.now(),
+    nonce: crypto.randomBytes(8).toString('hex')
+  };
+  
+  // Sign the payload
+  const privateKey = process.env.PRIVATE_KEY;
+  if (privateKey) {
+    const signPayload = JSON.stringify(payload);
+    const hash = crypto.createHash('sha256').update(signPayload).digest('hex');
+    const wallet = new ethers.Wallet(privateKey);
+    payload.signature = wallet.signMessage(hash).then(s => s).catch(() => 'no-signature');
+  } else {
+    payload.signature = 'demo-signature';
+  }
+  
+  return payload;
+}
+
+// Generate QR payload endpoint
+app.post('/generate-qr-payload', async (req, res) => {
+  const { campaignId, stadiumId } = req.body;
+  
+  if (!campaignId || !stadiumId) {
+    return res.status(400).json({ error: 'campaignId and stadiumId required' });
+  }
+  
+  const campaign = campaignStore.get(campaignId);
+  if (!campaign) {
+    return res.status(404).json({ error: 'Campaign not found' });
+  }
+  
+  const payload = generateSignedQRPayload(campaignId, stadiumId);
+  
+  if (payload.signature && typeof payload.signature.then === 'function') {
+    payload.signature = await payload.signature;
+  }
+  
+  res.json({
+    success: true,
+    payload,
+    qrData: JSON.stringify(payload)
+  });
+});
+
+// Verify QR payload endpoint
+app.post('/verify-qr-payload', async (req, res) => {
+  const { qrData } = req.body;
+  
+  if (!qrData) {
+    return res.status(400).json({ error: 'qrData required' });
+  }
+  
+  try {
+    const payload = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+    
+    // Validate version
+    if (!payload.v || payload.v !== 1) {
+      return res.status(400).json({ error: 'Invalid QR version' });
+    }
+    
+    // Check timestamp expiry (24 hours)
+    const maxAge = 24 * 60 * 60 * 1000;
+    if (Date.now() - payload.timestamp > maxAge) {
+      return res.status(400).json({ error: 'QR code expired' });
+    }
+    
+    const campaign = campaignStore.get(payload.campaignId);
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+    
+    const stadium = CONFIG.stadiums[payload.stadiumId];
+    if (!stadium) {
+      return res.status(404).json({ error: 'Stadium not found' });
+    }
+    
+    res.json({
+      valid: true,
+      campaign: {
+        id: campaign.id,
+        name: campaign.name,
+        stadiumId: campaign.stadiumId,
+        pointsPerCheckIn: campaign.rewards?.pointsPerCheckIn || 100,
+        bonusPoints: campaign.rewards?.bonusPoints || 50
+      },
+      stadium: {
+        id: payload.stadiumId,
+        name: stadium.name || stadium.stadiumName,
+        lat: stadium.lat,
+        lng: stadium.lng
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ error: 'Invalid QR data' });
+  }
 });
 
 // Join campaign
 app.post('/campaigns/:id/join', (req, res) => {
   const { wallet, payload, signature } = req.body;
   const campaign = campaignStore.get(req.params.id);
-  
+
   if (!campaign) {
     return res.status(404).json({ error: 'Campaign not found' });
   }
-  
+
   if (campaign.status !== 'active') {
     return res.status(400).json({ error: 'Campaign not active' });
   }
-  
+
   const now = new Date();
   const start = new Date(campaign.startTime);
   const end = new Date(campaign.endTime);
-  
+
   if (now < start || now > end) {
     return res.status(400).json({ error: 'Campaign not within valid time window' });
   }
-  
+
   // Process check-in
   const checkIn = {
     id: uuidv4(),
@@ -548,24 +653,24 @@ app.post('/campaigns/:id/join', (req, res) => {
     network: getNetworkFingerprint(req),
     verifiedAt: Date.now()
   };
-  
+
   checkInStore.push(checkIn);
-  
+
   const walletData = getOrCreateWallet(wallet);
   walletData.checkIns.push(checkIn);
   walletData.points += campaign.rewards.pointsPerCheckIn;
-  
+
   if (!walletData.campaigns.includes(campaign.id)) {
     walletData.campaigns.push(campaign.id);
     campaign.currentParticipants++;
   }
-  
+
   // Mint NFT if eligible
   let nft = null;
   if (campaign.rewards.nftReward) {
     nft = mintNFT(wallet, campaign);
   }
-  
+
   res.json({
     success: true,
     checkIn: { id: checkIn.id, stadiumId: checkIn.stadiumId, timestamp: checkIn.timestamp },
@@ -580,15 +685,15 @@ app.post('/campaigns/:id/join', (req, res) => {
 // Validate location
 app.post('/validate-location', (req, res) => {
   const { wallet, lat, lng, stadiumId, isMockLocation, isEmulator, sensorMismatch, deviceAttestation, selfieData } = req.body;
-  
+
   if (!stadiumId || !CONFIG.stadiums[stadiumId]) {
     return res.status(400).json({ valid: false, error: 'Invalid stadium' });
   }
-  
+
   const stadium = CONFIG.stadiums[stadiumId];
   const distance = haversineDistance(lat, lng, stadium.lat, stadium.lng);
   const geoValid = distance <= stadium.radius;
-  
+
   const riskData = {
     lat, lng,
     stadiumId,
@@ -600,9 +705,9 @@ app.post('/validate-location', (req, res) => {
     networkRisk: false,
     attestationFailed: !deviceAttestation
   };
-  
+
   const risk = evaluateRisk(riskData);
-  
+
   res.json({
     valid: risk.allowed && geoValid,
     risk,
@@ -659,13 +764,13 @@ app.get('/analytics', (req, res) => {
   const totalWallets = walletStore.size;
   const totalNFTs = Array.from(walletStore.values()).reduce((sum, w) => sum + w.nfts.length, 0);
   const totalPoints = Array.from(walletStore.values()).reduce((sum, w) => sum + w.points, 0);
-  
+
   const campaignStats = Array.from(campaignStore.values()).map(c => ({
     id: c.id,
     name: c.name,
     participants: c.currentParticipants
   }));
-  
+
   res.json({
     totalCheckIns,
     totalWallets,
@@ -758,9 +863,9 @@ app.get('/stadiums', (req, res) => {
       stadiumName: venue.stadiumName || venue.name || key,
       lat: venue.lat || venue.coordinates?.lat,
       lng: venue.lng || venue.coordinates?.lng,
-      coordinates: { 
-        lat: venue.lat || venue.coordinates?.lat, 
-        lng: venue.lng || venue.coordinates?.lng 
+      coordinates: {
+        lat: venue.lat || venue.coordinates?.lat,
+        lng: venue.lng || venue.coordinates?.lng
       },
       radius: venue.radius,
       city: venue.city,
@@ -790,7 +895,7 @@ app.post('/venues/reload', (req, res) => {
 });
 
 app.get('/config', (req, res) => {
-  res.json({ 
+  res.json({
     geo: CONFIG.geo,
     risk: CONFIG.risk,
     blockchain: CONFIG.blockchain,
@@ -816,27 +921,27 @@ app.get('/blockchain/rewards/:wallet', (req, res) => {
 app.post('/verify', async (req, res) => {
   const { payload, signature } = req.body;
   const stadium = CONFIG.stadiums[payload?.stadiumId];
-  
+
   if (!stadium) {
     return res.json({ success: false, message: 'Invalid stadium' });
   }
-  
+
   const distance = haversineDistance(payload.lat, payload.lng, stadium.lat, stadium.lng);
   const geoValid = distance <= stadium.radius;
-  
+
   const riskData = {
     ...payload,
     geoValid,
     timestampAge: Date.now() / 1000 - (payload.timestamp || 0),
     networkRisk: false
   };
-  
+
   const risk = evaluateRisk(riskData);
-  
+
   if (!risk.allowed) {
     return res.json({ success: false, message: 'Risk check failed', risk });
   }
-  
+
   const checkIn = {
     id: uuidv4(),
     stadiumId: payload.stadiumId,
@@ -845,33 +950,155 @@ app.post('/verify', async (req, res) => {
     riskScore: risk.score,
     verifiedAt: Date.now()
   };
-  
+
   checkInStore.push(checkIn);
+
+  // NOTE: NFT minting now happens on frontend via MetaMask
+  // See frontend handleCheckIn() -> calls contract directly
+  // For now, just return check-in verified
+
+  return res.json({
+    success: true,
+    checkIn,
+    message: 'Check-in verified! Mint NFT via MetaMask to complete.'
+  });
+});
+
+// ==================== EIP-712 SIGNED MINTING ====================
+
+// EIP-712 domain separator (must match contract)
+const EIP712_DOMAIN = {
+  name: "PSL FanChain",
+  version: "1",
+  chainId: parseInt(process.env.WIREFLUID_CHAIN_ID) || 92533,
+};
+
+// CheckInProof type hash (must match contract)
+const CHECKIN_TYPEHASH = "0x" + Buffer.from(
+  "CheckInProof(address user,uint256 campaignId,uint256 lat,uint256 lng,uint256 timestamp,uint256 nonce,uint256 expiry)"
+).toString("hex");
+
+// Rate limiting for proof generation
+const proofRequests = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_PROOFS_PER_WINDOW = 10; // 10 proofs per minute
+
+function checkRateLimit(wallet) {
+  const now = Date.now();
+  const key = wallet.toLowerCase();
   
-  // Mint NFT on blockchain (required for actual minting)
-  let blockchainResult;
+  if (!proofRequests.has(key)) {
+    proofRequests.set(key, []);
+  }
+  
+  const requests = proofRequests.get(key).filter(t => now - t < RATE_LIMIT_WINDOW);
+  
+  if (requests.length >= MAX_PROOFS_PER_WINDOW) {
+    throw new Error('Rate limit exceeded. Try again later.');
+  }
+  
+  requests.push(now);
+  proofRequests.set(key, requests);
+}
+
+// Generate EIP-712 signature for check-in proof
+function signCheckInProof(proofData) {
+  const privateKey = process.env.PLATFORM_PRIVATE_KEY || process.env.PRIVATE_KEY;
+  if (!privateKey) {
+    throw new Error('PLATFORM_PRIVATE_KEY not configured');
+  }
+  
+  const contractAddress = (process.env.NFT_CONTRACT_ADDRESS || '0xEA4A645A16Eb5291343813F24cc5b451E2a48f8d').toLowerCase();
+  const chainId = parseInt(process.env.WIREFLUID_CHAIN_ID) || 92533;
+  
+  // Add expiry to prevent replay (5 minute window)
+  const expiry = Math.floor(Date.now() / 1000) + (5 * 60); // 5 minutes
+  
+  // Create domain separator hash with chainId and contract address
+  const domainHash = ethers.id(
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ["bytes32", "bytes32", "bytes32", "uint256", "address"],
+      [
+        ethers.id("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+        ethers.id(EIP712_DOMAIN.name),
+        ethers.id(EIP712_DOMAIN.version),
+        chainId,
+        contractAddress
+      ]
+    )
+  );
+  
+  // Create proof struct hash with expiry
+  const proofHash = ethers.id(
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ["bytes32", "address", "uint256", "uint256", "uint256", "uint256", "uint256", "uint256"],
+      [
+        CHECKIN_TYPEHASH,
+        proofData.user,
+        proofData.campaignId,
+        proofData.lat,
+        proofData.lng,
+        proofData.timestamp,
+        proofData.nonce,
+        expiry
+      ]
+    )
+  );
+  
+  // Create signed message hash
+  const signedMessageHash = ethers.id(
+    ethers.solidityPacked(
+      ["bytes1", "bytes32", "bytes32"],
+      ["0x19", "0x01", ethers.keccak256(ethers.concat([domainHash, proofHash]))]
+    )
+  );
+  
+  // Sign the message
+  const wallet = new ethers.Wallet(privateKey);
+  const signature = wallet.signMessage(ethers.getBytes(signedMessageHash));
+  
+  return { signature, expiry };
+}
+
+// Generate signed proof endpoint
+app.post('/generate-proof', async (req, res) => {
+  const { user, campaignId, lat, lng, stadiumId } = req.body;
+  
+  if (!user || !campaignId) {
+    return res.status(400).json({ error: 'user and campaignId required' });
+  }
+  
+  // Check rate limit
   try {
-    blockchainResult = await mintNFTOnChain(
-      payload.deviceId || 'unknown',
-      payload.stadiumId,
-      payload.stadiumId,
-      stadium.name,
-      payload.lat,
-      payload.lng
-    );
-  } catch (blockchainErr) {
-    console.log('❌ Blockchain mint failed:', blockchainErr.message);
-    return res.status(500).json({
-      success: false,
-      checkIn,
-      blockchain: { success: false, error: blockchainErr.message },
-      message: 'Check-in verified but NFT minting failed'
-    });
-  }
+    checkRateLimit(user);
+  } catch (rateErr) {
+    return res.status(429).json({ error: rateErr.message });
   }
   
- 
-);
+  try {
+    const proofData = {
+      user,
+      campaignId: parseInt(campaignId),
+      lat: Math.floor(lat * 1000000),
+      lng: Math.floor(lng * 1000000),
+      timestamp: Math.floor(Date.now() / 1000),
+      nonce: crypto.randomBytes(16).toString('hex')
+    };
+    
+    const { signature, expiry } = signCheckInProof(proofData);
+    
+    res.json({
+      success: true,
+      proof: proofData,
+      signature,
+      expiry,
+      contractAddress: process.env.NFT_CONTRACT_ADDRESS || '0x35f385e2Fd110fc069fc6f643EC9ecb887FAD06a'
+    });
+  } catch (err) {
+    console.error('Generate proof error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.post('/demo/generate', (req, res) => {
   res.json({
@@ -894,31 +1121,31 @@ app.post('/demo/generate', (req, res) => {
 // Gift a ticket to another user
 app.post('/tickets/gift', (req, res) => {
   const { ticketId, fromUserId, toUserId, message } = req.body;
-  
+
   if (!ticketId || !fromUserId || !toUserId) {
     return res.status(400).json({ error: 'ticketId, fromUserId, and toUserId required' });
   }
-  
+
   const ticket = ticketStore.get(ticketId);
   if (!ticket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
-  
+
   // Check ownership
   if (ticket.userId !== fromUserId) {
     return res.status(403).json({ error: 'You do not own this ticket' });
   }
-  
+
   // Check if already used
   if (ticket.status === 'used') {
     return res.status(400).json({ error: 'Ticket already used, cannot gift' });
   }
-  
+
   // Check transfer limit
   if (ticket.transferCount >= (ticket.maxTransfers || 1)) {
     return res.status(400).json({ error: 'Transfer limit reached (max 1 gift per ticket)' });
   }
-  
+
   // Create gift record
   const giftRecord = {
     from: fromUserId,
@@ -927,23 +1154,23 @@ app.post('/tickets/gift', (req, res) => {
     timestamp: new Date().toISOString(),
     status: 'pending' // Needs recipient verification
   };
-  
+
   // Initialize gift history if not exists
   if (!ticket.giftHistory) {
     ticket.giftHistory = [];
   }
   ticket.giftHistory.push(giftRecord);
-  
+
   // Mark as gifted, pending verification
   ticket.isGift = true;
   ticket.giftPending = true;
   ticket.transferCount = (ticket.transferCount || 0) + 1;
   ticket.pendingRecipient = toUserId;
-  
+
   // Generate gift claim code
   const claimCode = crypto.randomBytes(4).toString('hex').toUpperCase();
   ticket.claimCode = claimCode;
-  
+
   res.json({
     success: true,
     ticketId,
@@ -958,40 +1185,40 @@ app.post('/tickets/gift', (req, res) => {
 // Claim a gifted ticket (recipient verifies)
 app.post('/tickets/claim', (req, res) => {
   const { ticketId, userId, claimCode } = req.body;
-  
+
   if (!ticketId || !userId || !claimCode) {
     return res.status(400).json({ error: 'ticketId, userId, and claimCode required' });
   }
-  
+
   const ticket = ticketStore.get(ticketId);
   if (!ticket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
-  
+
   // Verify claim code
   if (ticket.claimCode !== claimCode) {
     return res.status(403).json({ error: 'Invalid claim code' });
   }
-  
+
   // Verify recipient matches
   if (ticket.pendingRecipient !== userId) {
     return res.status(403).json({ error: 'This gift is not for you' });
   }
-  
+
   // Update ownership
   ticket.userId = userId;
   ticket.currentOwner = userId;
   ticket.giftPending = false;
   ticket.giftVerified = true;
   ticket.claimCode = null;
-  
+
   // Update gift record status
   const lastGift = ticket.giftHistory[ticket.giftHistory.length - 1];
   if (lastGift) {
     lastGift.status = 'claimed';
     lastGift.claimedAt = new Date().toISOString();
   }
-  
+
   res.json({
     success: true,
     ticketId,
@@ -1007,7 +1234,7 @@ app.get('/tickets/:ticketId/gift-history', (req, res) => {
   if (!ticket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
-  
+
   res.json({
     ticketId: req.params.ticketId,
     originalOwner: ticket.originalOwner || ticket.userId,
@@ -1031,7 +1258,7 @@ app.get('/tickets/pending/:userId', (req, res) => {
       message: t.giftHistory?.[t.giftHistory.length - 1]?.message || 'You received a gift!',
       giftedAt: t.giftHistory?.[t.giftHistory.length - 1]?.timestamp
     }));
-  
+
   res.json({ pendingGifts });
 });
 
@@ -1048,7 +1275,7 @@ app.get('/tickets/events', (req, res) => {
       radius: venue.radius,
       ticketCount: Array.from(ticketStore.values()).filter(t => t.eventId === id && t.status === 'valid').length
     }));
-  
+
   res.json({ events });
 });
 
@@ -1064,24 +1291,24 @@ app.get('/tickets/user/:userId', (req, res) => {
       usedAt: t.usedAt,
       qrData: t.qrData
     }));
-  
+
   res.json({ tickets: userTickets });
 });
 
 // Generate new ticket (for demo)
 app.post('/tickets/generate', (req, res) => {
   const { eventId, userId } = req.body;
-  
+
   if (!eventId || !userId) {
     return res.status(400).json({ error: 'eventId and userId required' });
   }
-  
+
   if (!CONFIG.stadiums[eventId]) {
     return res.status(400).json({ error: 'Invalid event' });
   }
-  
+
   const ticket = generateTicketQR(eventId, userId);
-  
+
   res.json({
     ticket,
     event: CONFIG.stadiums[eventId],
@@ -1092,13 +1319,13 @@ app.post('/tickets/generate', (req, res) => {
 // Verify ticket at entry point
 app.post('/tickets/verify', (req, res) => {
   const { qrData, lat, lng, deviceId, userId } = req.body;
-  
+
   if (!qrData || lat === undefined || lng === undefined) {
     return res.status(400).json({ error: 'qrData, lat, and lng required' });
   }
-  
+
   const result = verifyTicket(qrData, lat, lng);
-  
+
   // Check for gifted ticket that needs verification
   if (result.valid) {
     const [ticketId] = qrData.split('|');
@@ -1113,7 +1340,7 @@ app.post('/tickets/verify', (req, res) => {
         requiresClaim: true
       });
     }
-    
+
     if (ticket) {
       // Mark as used
       ticket.status = 'used';
@@ -1122,7 +1349,7 @@ app.post('/tickets/verify', (req, res) => {
       ticket.usedLocation = { lat, lng };
     }
   }
-  
+
   res.json({
     ...result,
     verifiedAt: new Date().toISOString(),
@@ -1133,11 +1360,11 @@ app.post('/tickets/verify', (req, res) => {
 // Get ticket status
 app.get('/tickets/:ticketId', (req, res) => {
   const ticket = ticketStore.get(req.params.ticketId);
-  
+
   if (!ticket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
-  
+
   res.json({
     ticketId: ticket.ticketId,
     eventId: ticket.eventId,
@@ -1152,11 +1379,11 @@ app.get('/tickets/:ticketId', (req, res) => {
 // Generate NFC-compatible ticket data
 app.get('/tickets/:ticketId/nfc', (req, res) => {
   const ticket = ticketStore.get(req.params.ticketId);
-  
+
   if (!ticket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
-  
+
   // NDEF message format for NFC
   const ndefMessage = {
     records: [
@@ -1170,7 +1397,7 @@ app.get('/tickets/:ticketId/nfc', (req, res) => {
       }
     ]
   };
-  
+
   res.json({
     ticketId: ticket.ticketId,
     ndefData: ticket.qrData,
@@ -1462,14 +1689,14 @@ async function createDefaultCampaign() {
       console.log('⚠️ Skipping default campaign (no Web3)');
       return;
     }
-    
+
     const account = web3.eth.accounts.privateKeyToAccount(privateKey);
     web3.eth.accounts.wallet.add(account);
     const adminWallet = account.address;
-    
+
     const now = Math.floor(Date.now() / 1000);
     const oneYear = 365 * 24 * 60 * 60;
-    
+
     // Create default campaign
     const tx = await fanChainContract.methods.createCampaign(
       'PSL FanChain 2026',
@@ -1483,7 +1710,7 @@ async function createDefaultCampaign() {
       100,
       '0x0000000000000000000000000000000000000000'
     ).send({ from: adminWallet, gas: 1000000 });
-    
+
     console.log('✅ Default campaign created on blockchain:', tx.transactionHash);
   } catch (err) {
     console.log('⚠️ Default campaign may already exist:', err.message);
@@ -1501,7 +1728,7 @@ app.listen(PORT, () => {
    Features:
    • Campaign Management
    • Multi-layer Anti-Spoof
-   • Wallet Integration  
+   • Wallet Integration
    • NFT Minting
    • Analytics Dashboard
    • Influencer Portal
