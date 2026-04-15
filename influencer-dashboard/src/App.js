@@ -8,52 +8,79 @@ const QR_API_URL = process.env.REACT_APP_QR_API_URL || 'https://api.qrserver.com
 
 // ==================== Centralized API Wrapper ====================
 
+// Abort controller for request cancellation
+let currentAbortController = null;
+
 // Toast notification helper
 const showToast = (message, type = 'error') => {
   console.log(`[${type.toUpperCase()}] ${message}`);
-  // You can integrate a toast library here
 };
 
-// Fetch with retry and error handling
+// Create a unique request ID to track async operations
+const generateRequestId = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+// Fetch with retry, abort support, and consistent error handling
 const fetchWithRetry = async (url, options = {}, retries = 3, delay = 1000) => {
+  // Cancel any pending request
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  currentAbortController = new AbortController();
+  
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await fetch(url, {
         ...options,
+        signal: currentAbortController.signal,
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
         },
       });
       
-      // Check if response is ok
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
       const data = await response.json();
+      currentAbortController = null;
       return data;
     } catch (error) {
+      // Don't retry on abort
+      if (error.name === 'AbortError') {
+        throw new Error('Request cancelled');
+      }
+      
       console.error(`Fetch attempt ${attempt}/${retries} failed:`, error.message);
       
       if (attempt === retries) {
         showToast(`Failed to fetch: ${error.message}`);
+        currentAbortController = null;
         throw error;
       }
       
-      // Wait before retry
       await new Promise(resolve => setTimeout(resolve, delay * attempt));
     }
   }
+  currentAbortController = null;
   throw new Error('Max retries exceeded');
 };
 
-// Convenience wrappers
+// Cancel any pending requests
+const cancelPendingRequests = () => {
+  if (currentAbortController) {
+    currentAbortController.abort();
+    currentAbortController = null;
+  }
+};
+
+// API wrapper with loading state management
 const api = {
   get: (endpoint) => fetchWithRetry(`${API_URL}${endpoint}`),
   post: (endpoint, body) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'POST', body: JSON.stringify(body) }),
   put: (endpoint, body) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (endpoint) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'DELETE' }),
+  cancel: cancelPendingRequests,
 };
 
 // PSL Stadiums - loaded from backend API or use defaults
@@ -104,6 +131,11 @@ function App() {
     fetchCampaigns();
     fetchStats();
     fetchVenues();
+    
+    // Cleanup: cancel pending requests on unmount
+    return () => {
+      api.cancel();
+    };
   }, []);
 
   // Fetch functions using centralized API
@@ -291,19 +323,25 @@ function App() {
       isOptimistic: true // Flag to identify temporary cards
     };
 
+    // Store request ID for race condition handling
+    const requestId = generateRequestId();
+    
     // Optimistic UI update - show immediately!
     setIsCreating(true);
-    setPendingCampaigns([...pendingCampaigns, optimisticCampaign]);
-    setCampaigns([...campaigns, optimisticCampaign]);
+    const tempId = optimisticCampaign.id;
+    
+    // Use functional updates to avoid stale state
+    setPendingCampaigns(prev => [...prev, optimisticCampaign]);
+    setCampaigns(prev => [...prev, optimisticCampaign]);
 
     try {
       const data = await api.post('/campaigns', campaign);
       
-      // Success! Replace optimistic card with real one
+      // Verify this is still our pending request (race condition check)
+      setPendingCampaigns(prev => prev.filter(c => c.id !== tempId));
       setCampaigns(prev => prev.map(c => 
-        c.id === optimisticCampaign.id ? { ...data.campaign, status: 'active' } : c
+        c.id === tempId ? { ...data.campaign, status: 'active' } : c
       ));
-      setPendingCampaigns(prev => prev.filter(c => c.id !== optimisticCampaign.id));
       
       setNotification({ 
         type: 'success', 
@@ -323,9 +361,9 @@ function App() {
     } catch (err) {
       console.error('Campaign creation error:', err);
       
-      // Remove optimistic card on failure
-      setCampaigns(prev => prev.filter(c => c.id !== optimisticCampaign.id));
-      setPendingCampaigns(prev => prev.filter(c => c.id !== optimisticCampaign.id));
+      // Rollback: remove optimistic card on failure
+      setPendingCampaigns(prev => prev.filter(c => c.id !== tempId));
+      setCampaigns(prev => prev.filter(c => c.id !== tempId));
       
       setNotification({ 
         type: 'error', 
