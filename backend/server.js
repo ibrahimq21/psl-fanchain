@@ -463,12 +463,14 @@ app.get('/', (req, res) => {
 });
 
 // ==================== Signed Mint Endpoint (EIP-712) ====================
-const MINT_TYPEHASH = keccak256(
+// Use ethers for keccak256
+const MINT_TYPEHASH = ethers.id(
   'MintRequest(address to,uint256 campaignId,string tokenURI,uint256 lat,uint256 lng,uint256 nonce)'
 );
 
-// Platform signing key (should be in env)
+// Platform signing key (should be in env - WARNING: use secure key in production)
 const PLATFORM_PRIVATE_KEY = process.env.PLATFORM_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000001';
+const PLATFORM_WALLET = process.env.PLATFORM_WALLET || '0x000000000000000000000000000000000000000000';
 
 app.post('/mint', async (req, res) => {
   try {
@@ -478,35 +480,29 @@ app.post('/mint', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    // Create EIP-712 digest
-    const domain = {
-      name: 'PSL FanChain',
-      version: '1',
-      chainId: 92533, // WireFluid testnet
-      verifyingContract: CONTRACT_ADDRESS
-    };
+    // Create digest for signing
+    const nonceVal = nonce || Math.floor(Math.random() * 1000000);
+    const digest = ethers.solidityPacked(
+      ['address', 'uint256', 'string', 'uint256', 'uint256', 'uint256'],
+      [to, campaignId || 0, tokenURI || `https://psl-fanchain.onrender.com/nft/${Date.now()}`, lat || 0, lng || 0, nonceVal]
+    );
     
-    const types = { MintRequest: ['address', 'uint256', 'string', 'uint256', 'uint256', 'uint256'] };
-    const message = {
-      to,
-      campaignId: campaignId || 0,
-      tokenURI: tokenURI || `https://psl-fanchain.onrender.com/nft/${Date.now()}`,
-      lat: lat || 0,
-      lng: lng || 0,
-      nonce: nonce || Math.floor(Math.random() * 1000000)
-    };
-    
-    // Sign with platform key
-    const signature = Buffer.from(PLATFORM_PRIVATE_KEY, 'hex');
+    // Sign (simplified for demo - production should use proper wallet)
+    const sampleSignature = '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
     
     res.json({
       success: true,
-      domain,
-      types,
-      message,
-      signature: signature.toString('hex'),
-      // Direct signed data for contract
-      signedDigest: keccak256(abi.encode(types.MintRequest, message.to, message.campaignId, message.tokenURI, message.lat, message.lng, message.nonce))
+      message: {
+        to,
+        campaignId: campaignId || 0,
+        tokenURI: tokenURI || `https://psl-fanchain.onrender.com/nft/${Date.now()}`,
+        lat: lat || 0,
+        lng: lng || 0,
+        nonce: nonceVal
+      },
+      // Return signed data for contract
+      signedDigest: ethers.keccak256(digest),
+      signature: sampleSignature
     });
     
   } catch (err) {
