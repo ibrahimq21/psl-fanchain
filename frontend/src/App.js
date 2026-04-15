@@ -199,24 +199,47 @@ function App() {
     }
   }, []);
 
-  // Test Venue: Create a mock venue near user's current location for instant testing
+  // Test Mode: Simulates check-in with mock campaign, bypasses geo, mints NFT on-chain
+  const [simulateCheckIn, setSimulateCheckIn] = useState(false);
+  const TEST_VENUE_ID = 'test_venue_dynamic';
+
+  // Test Venue: Create a mock venue near user's current location + deterministic offset
   const addTestVenue = () => {
     if (!userLocation) {
       setMessage('⚠️ Wait for location...');
       return;
     }
+    
+    // Small deterministic offset (±0.0005) for consistent but real-adjacent testing
+    const offset = 0.0005;
+    const testLat = userLocation.lat + offset;
+    const testLng = userLocation.lng + offset;
+    
     const testVenue = {
-      id: 'test_venue_' + Date.now(),
-      name: '⚡ Test Venue',
-      lat: userLocation.lat + (Math.random() - 0.5) * 0.002,
-      lng: userLocation.lng + (Math.random() - 0.5) * 0.002,
+      id: TEST_VENUE_ID,
+      name: '⚡ Test Venue (On-Chain)',
+      lat: testLat,
+      lng: testLng,
       radius: 500,
       city: 'Test City',
-      isEvent: true
+      isEvent: true,
+      isTest: true,
+      baseLat: userLocation.lat,  // Store user's original location
+      baseLng: userLocation.lng
     };
     setVenues(prev => [...prev, testVenue]);
     setSelectedStadium(testVenue);
-    setMessage(`✅ Test Venue added at ${testVenue.lat.toFixed(4)}, ${testVenue.lng.toFixed(4)}`);
+    setSimulateCheckIn(true);
+    setMessage(`✅ Test Mode! Near: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)} - Mint via contract`);
+  };
+
+  // Clear test mode
+  const clearTestVenue = () => {
+    setVenues(prev => prev.filter(v => !v.isTest));
+    const nextVenue = venues.find(v => !v.isTest);
+    setSelectedStadium(nextVenue || null);
+    setSimulateCheckIn(false);
+    setMessage('Test mode disabled');
   };
 
   useEffect(() => {
@@ -344,15 +367,50 @@ function App() {
   };
 
   const handleCheckIn = async (stadiumId) => {
+    // Check if in test mode
+    const isTestMode = selectedStadium?.isTest || simulateCheckIn;
+    
     // Use selectedStadium or first available venue
     const targetStadium = stadiumId || selectedStadium?.id || venues[0]?.id;
     if (!wallet) return;
     if (!targetStadium) {
-      setMessage('No stadium selected');
+      setMessage('No venue selected');
       return;
     }
     setLoading(true);
+    
     try {
+      // Test Mode: Bypass geo validation, use user's nearby location, mint on-chain
+      if (isTestMode) {
+        const testVenue = selectedStadium;
+        const mintLat = testVenue?.baseLat || userLocation?.lat;
+        const mintLng = testVenue?.baseLng || userLocation?.lng;
+        
+        setMessage('⚡ Test Mode: Minting NFT from your location...');
+        
+        const testTokenURI = `https://psl-fanchain.onrender.com/nft/test-${Date.now()}`;
+        
+        // Call smart contract mintTest function with real nearby coords
+        try {
+          const txHash = await mintNFTWithMetaMask(
+            wallet, 
+            4,  // Campaign ID
+            testVenue?.name || 'Test Campaign', 
+            mintLat,
+            mintLng
+          );
+          setMessage(`✅ Test NFT minted from (${mintLat?.toFixed(4)}, ${mintLng?.toFixed(4)})! Tx: ${txHash.substring(0, 12)}...`);
+        } catch (mintErr) {
+          console.error('Mint failed:', mintErr);
+          setMessage(`✅ Test check-in from (${mintLat?.toFixed(4)}, ${mintLng?.toFixed(4)})! (simulated)`);
+        }
+        
+        setLoading(false);
+        fetchWalletData(wallet);
+        return;
+      }
+      
+      // Normal Mode: Require actual location
       const payload = {
         lat: userLocation?.lat,
         lng: userLocation?.lng,
@@ -826,7 +884,8 @@ function App() {
         <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); stopScanner(); }}>👤 Profile</button>
         <button className={activeTab === 'rewards' ? 'active' : ''} onClick={() => { setActiveTab('rewards'); fetchRewards(); stopScanner(); }}>🎁 Rewards</button>
         <button className={activeTab === 'leaderboard' ? 'active' : ''} onClick={() => { setActiveTab('leaderboard'); fetchLeaderboard(); stopScanner(); }}>🏆 Leaderboard</button>
-        <button onClick={addTestVenue} title="Add test venue near you">⚡ Test</button>
+        <button onClick={addTestVenue} title="Add test venue for NFT mint testing" disabled={simulateCheckIn}>⚡ Test</button>
+        {simulateCheckIn && <button onClick={clearTestVenue} title="Exit test mode">✕</button>}
       </nav>
 
       <main className="main">
