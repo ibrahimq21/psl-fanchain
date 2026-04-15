@@ -709,7 +709,8 @@ function App() {
       console.error('Scan error:', e);
       setMessage(`❌ Error: ${e.message}`);
     } finally {
-      setTimeout(() => { scanLockRef.current = false }, 3000);
+      // Always reset lock in finally - no timing-based bugs
+      scanLockRef.current = false;
     }
   };
 
