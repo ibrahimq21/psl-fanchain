@@ -80,6 +80,15 @@ function App() {
     rewards: 'both'
   });
 
+  // Field validation errors
+  const [fieldErrors, setFieldErrors] = useState({});
+  
+  // Loading state for campaign creation
+  const [isCreating, setIsCreating] = useState(false);
+  
+  // Optimistic UI - pending campaigns
+  const [pendingCampaigns, setPendingCampaigns] = useState([]);
+
   // Demo influencer data
   const [influencerData] = useState({
     name: 'PSL Influencer',
@@ -183,9 +192,78 @@ function App() {
     }
   };
 
+  // ==================== Validation Functions ====================
+  const validateField = (name, value) => {
+    switch (name) {
+      case 'name':
+        if (!value || value.trim().length < 3) return 'Name must be at least 3 characters';
+        if (value.length > 100) return 'Name must be less than 100 characters';
+        return null;
+      case 'stadiumId':
+        if (!value) return 'Please select a location';
+        return null;
+      case 'startTime':
+        if (!value) return 'Start time is required';
+        const start = new Date(value);
+        if (start < new Date()) return 'Start time must be in the future';
+        return null;
+      case 'endTime':
+        if (value && new Date(value) <= new Date(newCampaign.startTime)) return 'End time must be after start time';
+        return null;
+      case 'maxParticipants':
+        if (value < 10) return 'Minimum 10 participants';
+        if (value > 10000) return 'Maximum 10,000 participants';
+        return null;
+      case 'pointsPerCheckIn':
+        if (value < 10) return 'Minimum 10 points';
+        if (value > 1000) return 'Maximum 1,000 points';
+        return null;
+      case 'bonusPoints':
+        if (value < 0) return 'Bonus points cannot be negative';
+        if (value > 500) return 'Maximum 500 bonus points';
+        return null;
+      default:
+        return null;
+    }
+  };
+
+  // Validate all fields
+  const validateAllFields = () => {
+    const errors = {};
+    Object.keys(newCampaign).forEach(key => {
+      const error = validateField(key, newCampaign[key]);
+      if (error) errors[key] = error;
+    });
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Handle field change with inline validation
+  const handleFieldChange = (field, value) => {
+    setNewCampaign({ ...newCampaign, [field]: value });
+    // Clear this field's error when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors({ ...fieldErrors, [field]: null });
+    }
+    // Real-time validation for this field
+    const error = validateField(field, value);
+    if (error) {
+      setFieldErrors({ ...fieldErrors, [field]: error });
+    }
+  };
+
+  // Handle form submission
   const handleCreateCampaign = async () => {
-    if (!newCampaign.name || !newCampaign.startTime) {
-      setNotification({ type: 'error', message: 'Please fill in required fields (name and start time)' });
+    // Validate all fields first
+    const errors = {};
+    Object.keys(newCampaign).forEach(key => {
+      const error = validateField(key, newCampaign[key]);
+      if (error) errors[key] = error;
+    });
+    setFieldErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      setNotification({ type: 'error', message: 'Please fix the validation errors below' });
       return;
     }
 
@@ -194,7 +272,7 @@ function App() {
       stadiumId: newCampaign.stadiumId,
       description: newCampaign.description,
       startTime: new Date(newCampaign.startTime).toISOString(),
-      endTime: new Date(newCampaign.endTime || newCampaign.startTime).toISOString(),
+      endTime: newCampaign.endTime ? new Date(newCampaign.endTime).toISOString() : new Date(newCampaign.startTime).toISOString(),
       rewards: {
         pointsPerCheckIn: newCampaign.pointsPerCheckIn,
         bonusPoints: newCampaign.bonusPoints,
@@ -203,28 +281,58 @@ function App() {
       maxParticipants: newCampaign.maxParticipants
     };
 
+    // Create optimistic campaign object (temporary UI)
+    const optimisticCampaign = {
+      ...campaign,
+      id: `temp_${Date.now()}`,
+      status: 'pending',
+      currentParticipants: 0,
+      createdAt: new Date().toISOString(),
+      isOptimistic: true // Flag to identify temporary cards
+    };
+
+    // Optimistic UI update - show immediately!
+    setIsCreating(true);
+    setPendingCampaigns([...pendingCampaigns, optimisticCampaign]);
+    setCampaigns([...campaigns, optimisticCampaign]);
+
     try {
       const data = await api.post('/campaigns', campaign);
       
-      // Success!
+      // Success! Replace optimistic card with real one
+      setCampaigns(prev => prev.map(c => 
+        c.id === optimisticCampaign.id ? { ...data.campaign, status: 'active' } : c
+      ));
+      setPendingCampaigns(prev => prev.filter(c => c.id !== optimisticCampaign.id));
+      
       setNotification({ 
         type: 'success', 
-        message: `✅ Campaign "${campaign.name}" created successfully! Campaign ID: ${data.campaign?.id || 'N/A'}`
+        message: `✅ Campaign "${campaign.name}" created successfully!`
       });
       
-      setCampaigns([...campaigns, data.campaign]);
-      setShowCreateForm(false);
-      setNewCampaign({ name: '', stadiumId: 'Gaddafi Stadium', description: '', startTime: '', endTime: '', maxParticipants: 500, pointsPerCheckIn: 100, bonusPoints: 50, rewards: 'both' });
+      // Reset form
+      setNewCampaign({ name: '', stadiumId: venues[0]?.id || '', description: '', startTime: '', endTime: '', maxParticipants: 500, pointsPerCheckIn: 100, bonusPoints: 50, rewards: 'both' });
+      setFieldErrors({});
+      
+      // Redirect to campaigns page after success
+      setActiveTab('campaigns');
       
       // Refresh stats
       fetchStats();
       
     } catch (err) {
       console.error('Campaign creation error:', err);
+      
+      // Remove optimistic card on failure
+      setCampaigns(prev => prev.filter(c => c.id !== optimisticCampaign.id));
+      setPendingCampaigns(prev => prev.filter(c => c.id !== optimisticCampaign.id));
+      
       setNotification({ 
         type: 'error', 
-        message: `❌ Failed to create campaign: ${err.message}. Please try again or check if the backend is running.`
+        message: `❌ Failed to create campaign: ${err.message}. Please try again.`
       });
+    } finally {
+      setIsCreating(false);
     }
     
     // Clear notification after 5 seconds
@@ -352,11 +460,11 @@ function App() {
             
             <div className="campaigns-grid">
               {campaigns.map(c => (
-                <div key={c.id} className="campaign-card">
+                <div key={c.id} className={`campaign-card ${c.isOptimistic ? 'optimistic' : ''}`}>
                   <div className="campaign-header">
                     <h3>{c.name}</h3>
                     <span className={`status ${c.status || 'active'}`}>
-                      {c.status === 'active' ? '🟢 Active' : '⏸️ Ended'}
+                      {c.isOptimistic ? '⏳ Pending...' : c.status === 'active' ? '🟢 Active' : '⏸️ Ended'}
                     </span>
                   </div>
                   
@@ -377,14 +485,21 @@ function App() {
                   </div>
 
                   <div className="campaign-qr">
-                    <img src={generateQRCode(c.id)} alt="Campaign QR" />
-                    <p>Scan to join</p>
+                    <img src={c.isOptimistic ? 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNi8+PC9zdmc+' : generateQRCode(c.id)} alt="Campaign QR" />
+                    <p>{c.isOptimistic ? 'QR after creation' : 'Scan to join'}</p>
                   </div>
 
                   <div className="campaign-actions">
-                    <button className="btn-small" onClick={() => handleGenerateSignedQR(c)}>📱 Generate QR</button>
-                    <button className="btn-small">📊 Analytics</button>
-                    <button className="btn-small">📤 Share</button>
+                    {!c.isOptimistic && (
+                      <>
+                        <button className="btn-small" onClick={() => handleGenerateSignedQR(c)}>📱 Generate QR</button>
+                        <button className="btn-small">📊 Analytics</button>
+                        <button className="btn-small">📤 Share</button>
+                      </>
+                    )}
+                    {c.isOptimistic && (
+                      <button className="btn-small" disabled>⏳ Waiting for confirmation</button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -410,21 +525,25 @@ function App() {
                   type="text" 
                   placeholder="e.g., PSL 2026 - Karachi Match"
                   value={newCampaign.name}
-                  onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
-                  required
+                  onChange={(e) => handleFieldChange('name', e.target.value)}
+                  className={fieldErrors.name ? 'error' : ''}
                 />
+                {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
               </div>
 
               <div className="form-group">
                 <label>Location *</label>
                 <select 
                   value={newCampaign.stadiumId}
-                  onChange={(e) => setNewCampaign({...newCampaign, stadiumId: e.target.value})}
+                  onChange={(e) => handleFieldChange('stadiumId', e.target.value)}
+                  className={fieldErrors.stadiumId ? 'error' : ''}
                 >
+                  <option value="">Select a venue...</option>
                   {venues.map(s => (
                     <option key={s.id} value={s.id}>{s.name} ({s.city})</option>
                   ))}
                 </select>
+                {fieldErrors.stadiumId && <span className="field-error">{fieldErrors.stadiumId}</span>}
               </div>
 
               <div className="form-group">
@@ -443,17 +562,20 @@ function App() {
                   <input 
                     type="datetime-local"
                     value={newCampaign.startTime}
-                    onChange={(e) => setNewCampaign({...newCampaign, startTime: e.target.value})}
-                    required
+                    onChange={(e) => handleFieldChange('startTime', e.target.value)}
+                    className={fieldErrors.startTime ? 'error' : ''}
                   />
+                  {fieldErrors.startTime && <span className="field-error">{fieldErrors.startTime}</span>}
                 </div>
                 <div className="form-group">
                   <label>End Time</label>
                   <input 
                     type="datetime-local"
                     value={newCampaign.endTime}
-                    onChange={(e) => setNewCampaign({...newCampaign, endTime: e.target.value})}
+                    onChange={(e) => handleFieldChange('endTime', e.target.value)}
+                    className={fieldErrors.endTime ? 'error' : ''}
                   />
+                  {fieldErrors.endTime && <span className="field-error">{fieldErrors.endTime}</span>}
                 </div>
               </div>
 
@@ -464,8 +586,10 @@ function App() {
                   min="10"
                   max="10000"
                   value={newCampaign.maxParticipants}
-                  onChange={(e) => setNewCampaign({...newCampaign, maxParticipants: parseInt(e.target.value)})}
+                  onChange={(e) => handleFieldChange('maxParticipants', parseInt(e.target.value))}
+                  className={fieldErrors.maxParticipants ? 'error' : ''}
                 />
+                {fieldErrors.maxParticipants && <span className="field-error">{fieldErrors.maxParticipants}</span>}
               </div>
 
               <div className="form-section">
@@ -479,8 +603,10 @@ function App() {
                       min="10"
                       max="1000"
                       value={newCampaign.pointsPerCheckIn}
-                      onChange={(e) => setNewCampaign({...newCampaign, pointsPerCheckIn: parseInt(e.target.value)})}
+                      onChange={(e) => handleFieldChange('pointsPerCheckIn', parseInt(e.target.value))}
+                      className={fieldErrors.pointsPerCheckIn ? 'error' : ''}
                     />
+                    {fieldErrors.pointsPerCheckIn && <span className="field-error">{fieldErrors.pointsPerCheckIn}</span>}
                   </div>
                   <div className="form-group">
                     <label>Bonus Points</label>
@@ -489,8 +615,10 @@ function App() {
                       min="0"
                       max="500"
                       value={newCampaign.bonusPoints}
-                      onChange={(e) => setNewCampaign({...newCampaign, bonusPoints: parseInt(e.target.value)})}
+                      onChange={(e) => handleFieldChange('bonusPoints', parseInt(e.target.value))}
+                      className={fieldErrors.bonusPoints ? 'error' : ''}
                     />
+                    {fieldErrors.bonusPoints && <span className="field-error">{fieldErrors.bonusPoints}</span>}
                   </div>
                 </div>
 
@@ -529,11 +657,11 @@ function App() {
               </div>
 
               <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setActiveTab('campaigns')}>
+                <button type="button" className="btn-secondary" onClick={() => setActiveTab('campaigns')} disabled={isCreating}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
-                  🚀 Create Campaign
+                <button type="submit" className="btn-primary" disabled={isCreating}>
+                  {isCreating ? '⏳ Creating...' : '🚀 Create Campaign'}
                 </button>
               </div>
             </form>
