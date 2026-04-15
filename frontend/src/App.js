@@ -45,6 +45,32 @@ function MapUpdater({ center }) {
   return null;
 }
 
+// ==================== Loading Spinner ====================
+function LoadingSpinner({ message = 'Loading...' }) {
+  return (
+    <div className="loading-overlay">
+      <div className="loading-spinner-container">
+        <div className="loading-spinner"></div>
+        <p className="loading-message">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+// Skeleton for venues list
+function SkeletonVenues() {
+  return (
+    <div className="skeleton-list">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="skeleton-item">
+          <div className="skeleton-line"></div>
+          <div className="skeleton-line short"></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [wallet, setWallet] = useState(null);
   const [connecting, setConnecting] = useState(false);
@@ -69,6 +95,7 @@ function App() {
 
   useEffect(() => {
     // Load venues from backend API (which uses shared venues.json)
+    setLoading(true);
     fetch(`${BACKEND_URL}/stadiums`)
       .then(r => r.json())
       .then(data => {
@@ -88,7 +115,8 @@ function App() {
           setSelectedStadium(stadiumList[0]);
         }
       })
-      .catch(err => console.error('Failed to load venues:', err));
+      .catch(err => console.error('Failed to load venues:', err))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -273,8 +301,9 @@ function App() {
       }
     } catch (err) {
       setMessage('Check-in failed');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const startScanner = async () => {
@@ -390,6 +419,9 @@ function App() {
 
   return (
     <div className="app">
+      {/* Global Loading Spinner */}
+      {loading && <LoadingSpinner message={connecting ? 'Connecting wallet...' : 'Loading...'} />}
+      
       <header className="header">
         <h1>🏏 PSL FanChain</h1>
         <p className="tagline">Anti-Spoof Location Check-in & Rewards</p>

@@ -8,6 +8,29 @@ const QR_API_URL = process.env.REACT_APP_QR_API_URL || 'https://api.qrserver.com
 // PSL Stadiums - loaded from backend API or use defaults
 // The actual venue list comes from the backend /stadiums endpoint
 
+// ==================== Loading Spinner Component ====================
+function LoadingSpinner({ message = 'Loading...' }) {
+  return (
+    <div className="loading-overlay">
+      <div className="loading-spinner-container">
+        <div className="loading-spinner"></div>
+        <p className="loading-message">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+// Skeleton loader for cards
+function SkeletonCard() {
+  return (
+    <div className="skeleton-card">
+      <div className="skeleton-title"></div>
+      <div className="skeleton-text"></div>
+      <div className="skeleton-text short"></div>
+    </div>
+  );
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [wallet, setWallet] = useState(null);
@@ -15,7 +38,8 @@ function App() {
   const [stats, setStats] = useState({ totalCampaigns: 0, totalParticipants: 0, totalRewards: 0 });
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [notification, setNotification] = useState(null);
-  const [venues, setVenues] = useState([]); // Load from backend
+  const [venues, setVenues] = useState([]);
+  const [loading, setLoading] = useState(false); // Global loading state
   const [newCampaign, setNewCampaign] = useState({
     name: '',
     stadiumId: '',
@@ -46,6 +70,7 @@ function App() {
   }, []);
 
   const fetchVenues = async () => {
+    setLoading(true);
     try {
       const res = await fetch(`${API_URL}/stadiums`);
       const data = await res.json();
@@ -65,10 +90,13 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to fetch venues:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchCampaigns = async () => {
+    setLoading(true);
     try {
       const res = await fetch(`${API_URL}/campaigns`);
       const data = await res.json();
@@ -91,6 +119,7 @@ function App() {
   };
 
   const fetchStats = async () => {
+    setLoading(true);
     try {
       const res = await fetch(`${API_URL}/analytics`);
       const data = await res.json();
@@ -105,6 +134,8 @@ function App() {
         totalParticipants: campaigns.reduce((sum, c) => sum + (c.currentParticipants || 0), 0),
         totalRewards: campaigns.length * 1000
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -113,6 +144,8 @@ function App() {
       setNotification({ type: 'error', message: 'Please fill in required fields (name and start time)' });
       return;
     }
+    
+    setLoading(true);
 
     const campaign = {
       name: newCampaign.name,
@@ -160,6 +193,8 @@ function App() {
         type: 'error', 
         message: `❌ Failed to create campaign: ${err.message}. Please try again or check if the backend is running.`
       });
+    } finally {
+      setLoading(false);
     }
     
     // Clear notification after 5 seconds
@@ -175,6 +210,9 @@ function App() {
 
   return (
     <div className="app">
+      {/* Global Loading Spinner */}
+      {loading && <LoadingSpinner />}
+      
       {/* Notification Banner */}
       {notification && (
         <div className={`notification ${notification.type}`}>
