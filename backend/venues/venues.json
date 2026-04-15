@@ -3,8 +3,8 @@
     "city": "Rawalpindi",
     "stadiumName": "Rawalpindi Cricket Stadium",
     "coordinates": {
-      "lat": 33.7266,
-      "lng": 73.0718
+      "lat": 33.651556,
+      "lng": 73.0734892
     },
     "radius": 500
   },
@@ -12,8 +12,8 @@
     "city": "Lahore",
     "stadiumName": "Gaddafi Stadium",
     "coordinates": {
-      "lat": 31.5204,
-      "lng": 74.3587
+      "lat": 31.5137112,
+      "lng": 74.330777
     },
     "radius": 500
   },
@@ -21,8 +21,8 @@
     "city": "Karachi",
     "stadiumName": "National Stadium",
     "coordinates": {
-      "lat": 24.8967,
-      "lng": 67.0817
+      "lat": 24.8959393,
+      "lng": 67.0789492
     },
     "radius": 500
   },
@@ -30,8 +30,8 @@
     "city": "Multan",
     "stadiumName": "Multan Cricket Stadium",
     "coordinates": {
-      "lat": 30.2032,
-      "lng": 71.4532
+      "lat": 30.1707628,
+      "lng": 71.5221887
     },
     "radius": 500
   },
@@ -39,8 +39,8 @@
     "city": "Lahore",
     "stadiumName": "PCB Head Office",
     "coordinates": {
-      "lat": 31.5285,
-      "lng": 74.3562
+      "lat": 31.5127,
+      "lng": 74.3316005
     },
     "radius": 300
   },
