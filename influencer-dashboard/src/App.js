@@ -8,9 +8,6 @@ const QR_API_URL = process.env.REACT_APP_QR_API_URL || 'https://api.qrserver.com
 
 // ==================== Centralized API Wrapper ====================
 
-// Abort controller for request cancellation
-let currentAbortController = null;
-
 // Toast notification helper
 const showToast = (message, type = 'error') => {
   console.log(`[${type.toUpperCase()}] ${message}`);
@@ -19,19 +16,12 @@ const showToast = (message, type = 'error') => {
 // Create a unique request ID to track async operations
 const generateRequestId = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-// Fetch with retry, abort support, and consistent error handling
+// Fetch with retry and consistent error handling
 const fetchWithRetry = async (url, options = {}, retries = 3, delay = 1000) => {
-  // Cancel any pending request
-  if (currentAbortController) {
-    currentAbortController.abort();
-  }
-  currentAbortController = new AbortController();
-  
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await fetch(url, {
         ...options,
-        signal: currentAbortController.signal,
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
@@ -43,44 +33,28 @@ const fetchWithRetry = async (url, options = {}, retries = 3, delay = 1000) => {
       }
       
       const data = await response.json();
-      currentAbortController = null;
       return data;
     } catch (error) {
-      // Don't retry on abort
-      if (error.name === 'AbortError') {
-        throw new Error('Request cancelled');
-      }
+      console.warn(`[Fetch] Attempt ${attempt}/${retries} failed:`, error.message);
       
-      console.error(`Fetch attempt ${attempt}/${retries} failed:`, error.message);
-      
-      if (attempt === retries) {
-        showToast(`Failed to fetch: ${error.message}`);
-        currentAbortController = null;
+      // Don't retry on network errors or parse errors (last attempt)
+      if (attempt === retries || error.name === 'SyntaxError') {
         throw error;
       }
       
+      // Wait before retry
       await new Promise(resolve => setTimeout(resolve, delay * attempt));
     }
   }
-  currentAbortController = null;
   throw new Error('Max retries exceeded');
 };
 
-// Cancel any pending requests
-const cancelPendingRequests = () => {
-  if (currentAbortController) {
-    currentAbortController.abort();
-    currentAbortController = null;
-  }
-};
-
-// API wrapper with loading state management
+// API wrapper
 const api = {
   get: (endpoint) => fetchWithRetry(`${API_URL}${endpoint}`),
   post: (endpoint, body) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'POST', body: JSON.stringify(body) }),
   put: (endpoint, body) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (endpoint) => fetchWithRetry(`${API_URL}${endpoint}`, { method: 'DELETE' }),
-  cancel: cancelPendingRequests,
 };
 
 // PSL Stadiums - loaded from backend API or use defaults
@@ -132,43 +106,92 @@ function App() {
     fetchStats();
     fetchVenues();
     
-    // Cleanup: cancel pending requests on unmount
+    // Cleanup on unmount
     return () => {
-      api.cancel();
+      // Cancel any pending fetch if needed
     };
   }, []);
 
-  // Fetch functions using centralized API
+  // ==================== Fetch Functions with Proper Error Handling ====================
+  
+  // Validate venue response structure
+  const isValidVenueResponse = (data) => {
+    if (!data || typeof data !== 'object') return false;
+    // Allow any object with venue data (flexible validation)
+    return Object.keys(data).length > 0;
+  };
+
+  // Normalize venue data from API
+  const normalizeVenue = ([key, v]) => ({
+    id: key,
+    name: v?.name || v?.stadiumName || key,
+    city: v?.city || 'Unknown',
+    lat: v?.lat || v?.coordinates?.lat || 0,
+    lng: v?.lng || v?.coordinates?.lng || 0,
+    radius: v?.radius || 500,
+    isEvent: v?.isEvent || false
+  });
+
+  // Default venues as fallback
+  const defaultVenues = [
+    { id: 'Rawalpindi Cricket Stadium', name: 'Rawalpindi Cricket Stadium', city: 'Rawalpindi', lat: 33.7266, lng: 73.0718, isEvent: false },
+    { id: 'Gaddafi Stadium', name: 'Gaddafi Stadium', city: 'Lahore', lat: 31.5204, lng: 74.3587, isEvent: false },
+    { id: 'National Stadium Karachi', name: 'National Stadium Karachi', city: 'Karachi', lat: 24.8967, lng: 67.0817, isEvent: false }
+  ];
+
   const fetchVenues = async () => {
+    console.log('[Venues] Fetching from API...');
     try {
-      const data = await api.get('/stadiums').catch(() => ({}));
-      if (!data || Object.keys(data).length === 0) {
-        console.log('Using default venues');
+      const data = await api.get('/stadiums');
+      
+      // Validate response
+      if (!isValidVenueResponse(data)) {
+        console.warn('[Venues] Invalid response, using defaults');
+        setVenues(defaultVenues);
         return;
       }
-      const venueOptions = Object.entries(data).map(([key, v]) => ({
-        id: key,
-        name: v.name || key,
-        city: v.city,
-        lat: v.lat,
-        lng: v.lng,
-        isEvent: v.isEvent || false
-      }));
+      
+      console.log('[Venues] Received:', Object.keys(data));
+      const venueOptions = Object.entries(data).map(normalizeVenue);
+      
+      // Ensure we have venues
+      if (venueOptions.length === 0) {
+        console.warn('[Venues] Empty response, using defaults');
+        setVenues(defaultVenues);
+        return;
+      }
+      
       setVenues(venueOptions);
-      if (venueOptions.length > 0 && !newCampaign.stadiumId) {
+      console.log(`[Venues] Loaded ${venueOptions.length} venues`);
+      
+      // Set default stadium if none selected
+      if (!newCampaign.stadiumId && venueOptions.length > 0) {
         setNewCampaign(prev => ({ ...prev, stadiumId: venueOptions[0].id }));
       }
     } catch (err) {
-      console.error('Failed to fetch venues:', err);
+      // Log the actual error
+      console.error('[Venues] Fetch failed:', err.message || err);
+      console.log('[Venues] Falling back to defaults');
+      setVenues(defaultVenues);
     }
   };
 
   const fetchCampaigns = async () => {
+    console.log('[Campaigns] Fetching from API...');
     try {
-      const data = await api.get('/campaigns').catch(() => ({ campaigns: [] }));
-      setCampaigns(data.campaigns || []);
+      const data = await api.get('/campaigns');
+      
+      // Validate response
+      if (!data || !Array.isArray(data.campaigns)) {
+        console.warn('[Campaigns] Invalid response, using empty');
+        setCampaigns([]);
+        return;
+      }
+      
+      console.log(`[Campaigns] Loaded ${data.campaigns.length} campaigns`);
+      setCampaigns(data.campaigns);
     } catch (err) {
-      console.error('Failed to fetch campaigns:', err);
+      console.error('[Campaigns] Fetch failed:', err.message || err);
       setCampaigns([]);
     }
   };
