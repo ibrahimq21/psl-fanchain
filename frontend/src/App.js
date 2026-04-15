@@ -131,16 +131,43 @@ function App() {
     fetch(`${BACKEND_URL}/venues`)
       .then(r => r.json())
       .then(data => {
-        // Handle both array and object responses
-        const venueList = Array.isArray(data) ? data : Object.entries(data || {}).map(([key, venue]) => ({
-          id: key,
-          name: venue.name || venue.stadiumName || key,
-          lat: venue.lat || venue.coordinates?.lat,
-          lng: venue.lng || venue.coordinates?.lng,
-          radius: venue.radius || 500,
-          city: venue.city,
-          isEvent: venue.isEvent || false
-        }));
+        // Handle response: { venues: { key: {...} } } or { key: {...} } or [{...}]
+        let venueList = [];
+        
+        if (data.venues && typeof data.venues === 'object') {
+          // Nested: { venues: { key: {...} } }
+          venueList = Object.entries(data.venues).map(([key, venue]) => ({
+            id: key,
+            name: venue.stadiumName || venue.name || key,
+            lat: venue.coordinates?.lat || venue.lat,
+            lng: venue.coordinates?.lng || venue.lng,
+            radius: venue.radius || 500,
+            city: venue.city,
+            isEvent: venue.isEvent || false
+          }));
+        } else if (Array.isArray(data)) {
+          // Direct array: [{...}]
+          venueList = data.map(venue => ({
+            id: venue.id,
+            name: venue.stadiumName || venue.name,
+            lat: venue.coordinates?.lat || venue.lat,
+            lng: venue.coordinates?.lng || venue.lng,
+            radius: venue.radius || 500,
+            city: venue.city,
+            isEvent: venue.isEvent || false
+          }));
+        } else if (typeof data === 'object') {
+          // Object: { key: {...} }
+          venueList = Object.entries(data).map(([key, venue]) => ({
+            id: key,
+            name: venue.stadiumName || venue.name || key,
+            lat: venue.coordinates?.lat || venue.lat,
+            lng: venue.coordinates?.lng || venue.lng,
+            radius: venue.radius || 500,
+            city: venue.city,
+            isEvent: venue.isEvent || false
+          }));
+        }
         
         // Filter valid venues with coordinates
         const validVenues = venueList.filter(v => 
