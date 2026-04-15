@@ -161,6 +161,26 @@ function App() {
     }
   }, []);
 
+  // Test Venue: Create a mock stadium near user's current location for instant testing
+  const addTestVenue = () => {
+    if (!userLocation) {
+      setMessage('⚠️ Wait for location...');
+      return;
+    }
+    const testVenue = {
+      id: 'test_venue_' + Date.now(),
+      name: '⚡ Test Venue',
+      lat: userLocation.lat + (Math.random() - 0.5) * 0.002,
+      lng: userLocation.lng + (Math.random() - 0.5) * 0.002,
+      radius: 500,
+      city: 'Test City',
+      isEvent: true
+    };
+    setVenues(prev => [...prev, testVenue]);
+    setSelectedStadium(testVenue);
+    setMessage(`✅ Test Venue added at ${testVenue.lat.toFixed(4)}, ${testVenue.lng.toFixed(4)}`);
+  };
+
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
@@ -755,6 +775,7 @@ function App() {
         <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); stopScanner(); }}>👤 Profile</button>
         <button className={activeTab === 'rewards' ? 'active' : ''} onClick={() => { setActiveTab('rewards'); fetchRewards(); stopScanner(); }}>🎁 Rewards</button>
         <button className={activeTab === 'leaderboard' ? 'active' : ''} onClick={() => { setActiveTab('leaderboard'); fetchLeaderboard(); stopScanner(); }}>🏆 Leaderboard</button>
+        <button onClick={addTestVenue} title="Add test venue near you">⚡ Test</button>
       </nav>
 
       <main className="main">
