@@ -147,16 +147,22 @@ function App() {
           setSelectedStadium(stadiumList[0]);
         }
       })
-      .catch(err => console.error('Failed to load venues:', err))
+      .catch(err => {
+        console.error('Failed to load venues:', err);
+        setVenues([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    // Get user location
+    // Get user location - required for geo check-in
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => setUserLocation({ lat: 31.5204, lng: 74.3587 })
+        (err) => {
+          console.warn('Location denied, check-ins may fail:', err);
+          setUserLocation(null);
+        }
       );
     }
   }, []);
@@ -316,8 +322,8 @@ function App() {
     setLoading(true);
     try {
       const payload = {
-        lat: userLocation?.lat || 31.5204,
-        lng: userLocation?.lng || 74.3587,
+        lat: userLocation?.lat,
+        lng: userLocation?.lng,
         timestamp: Math.floor(Date.now() / 1000),
         nonce: Math.random().toString(36).substring(7),
         stadiumId,
@@ -326,6 +332,13 @@ function App() {
         isEmulator: false,
         sensorMismatch: false
       };
+      
+      // Require actual location for check-in
+      if (!userLocation?.lat || !userLocation?.lng) {
+        setMessage('⚠️ Location required. Enable GPS.');
+        setLoading(false);
+        return;
+      }
 
       const response = await fetch(`${BACKEND_URL}/verify`, {
         method: 'POST',
@@ -692,11 +705,17 @@ function App() {
             qrData: ticketData,
             campaignId: qrPayload.campaignId,
             stadiumId: qrPayload.stadiumId,
-            lat: userLocation?.lat || 31.5204,
-            lng: userLocation?.lng || 74.3587,
+            lat: userLocation?.lat,
+            lng: userLocation?.lng,
             deviceId: wallet || 'demo'
           })
         }).then(r => r.json());
+        
+        if (!userLocation) {
+          setMessage('⚠️ Location required for verification');
+          setLoading(false);
+          return;
+        }
         
         setMessage(checkInResult.success 
           ? `✅ Verified! +${verifyResult.campaign?.pointsPerCheckIn || 100} pts`
@@ -713,8 +732,8 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         qrData: ticketData,
-        lat: userLocation?.lat || 31.5204,
-        lng: userLocation?.lng || 74.3587,
+        lat: userLocation?.lat,
+        lng: userLocation?.lng,
         deviceId: wallet || 'demo'
       })
     }).then(r => r.json()).then(data => {
