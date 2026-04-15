@@ -126,25 +126,30 @@ function App() {
 
 
   useEffect(() => {
-    // Load venues from backend API (which uses shared venues.json)
+    // Load venues from backend API
     setLoading(true);
-    fetch(`${BACKEND_URL}/stadiums`)
+    fetch(`${BACKEND_URL}/venues`)
       .then(r => r.json())
       .then(data => {
-        const stadiumList = Object.entries(data)
-    .map(([key, venue]) => ({
-      id: key,
-      name: venue.name || venue.stadiumName || key,
-      lat: venue.lat || venue.coordinates?.lat,
-      lng: venue.lng || venue.coordinates?.lng,
-      radius: venue.radius || 500,
-      city: venue.city,
-      isEvent: venue.isEvent || false
-    }))
-    .filter(v => typeof v.lat === 'number' && typeof v.lng === 'number'); 
-        if (stadiumList.length > 0) {
-          setVenues(stadiumList);
-          setSelectedStadium(stadiumList[0]);
+        // Handle both array and object responses
+        const venueList = Array.isArray(data) ? data : Object.entries(data || {}).map(([key, venue]) => ({
+          id: key,
+          name: venue.name || venue.stadiumName || key,
+          lat: venue.lat || venue.coordinates?.lat,
+          lng: venue.lng || venue.coordinates?.lng,
+          radius: venue.radius || 500,
+          city: venue.city,
+          isEvent: venue.isEvent || false
+        }));
+        
+        // Filter valid venues with coordinates
+        const validVenues = venueList.filter(v => 
+          v.id && typeof v.lat === 'number' && typeof v.lng === 'number'
+        );
+        
+        if (validVenues.length > 0) {
+          setVenues(validVenues);
+          setSelectedStadium(validVenues[0]);
         }
       })
       .catch(err => {
@@ -167,7 +172,7 @@ function App() {
     }
   }, []);
 
-  // Test Venue: Create a mock stadium near user's current location for instant testing
+  // Test Venue: Create a mock venue near user's current location for instant testing
   const addTestVenue = () => {
     if (!userLocation) {
       setMessage('⚠️ Wait for location...');
