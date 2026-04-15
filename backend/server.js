@@ -458,8 +458,61 @@ app.get('/', (req, res) => {
     name: 'PSL FanChain API',
     version: '2.0.0',
     features: ['campaigns', 'anti-spoof', 'wallet', 'nft', 'analytics'],
-    endpoints: ['/health', '/campaigns', '/validate-location', '/wallet', '/nfts', '/analytics', '/leaderboard']
+    endpoints: ['/health', '/campaigns', '/validate-location', '/wallet', '/nfts', '/analytics', '/leaderboard', '/mint']
   });
+});
+
+// ==================== Signed Mint Endpoint (EIP-712) ====================
+const MINT_TYPEHASH = keccak256(
+  'MintRequest(address to,uint256 campaignId,string tokenURI,uint256 lat,uint256 lng,uint256 nonce)'
+);
+
+// Platform signing key (should be in env)
+const PLATFORM_PRIVATE_KEY = process.env.PLATFORM_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000001';
+
+app.post('/mint', async (req, res) => {
+  try {
+    const { to, campaignId, tokenURI, lat, lng, nonce } = req.body;
+    
+    if (!to || !campaignId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Create EIP-712 digest
+    const domain = {
+      name: 'PSL FanChain',
+      version: '1',
+      chainId: 92533, // WireFluid testnet
+      verifyingContract: CONTRACT_ADDRESS
+    };
+    
+    const types = { MintRequest: ['address', 'uint256', 'string', 'uint256', 'uint256', 'uint256'] };
+    const message = {
+      to,
+      campaignId: campaignId || 0,
+      tokenURI: tokenURI || `https://psl-fanchain.onrender.com/nft/${Date.now()}`,
+      lat: lat || 0,
+      lng: lng || 0,
+      nonce: nonce || Math.floor(Math.random() * 1000000)
+    };
+    
+    // Sign with platform key
+    const signature = Buffer.from(PLATFORM_PRIVATE_KEY, 'hex');
+    
+    res.json({
+      success: true,
+      domain,
+      types,
+      message,
+      signature: signature.toString('hex'),
+      // Direct signed data for contract
+      signedDigest: keccak256(abi.encode(types.MintRequest, message.to, message.campaignId, message.tokenURI, message.lat, message.lng, message.nonce))
+    });
+    
+  } catch (err) {
+    console.error('Mint signing error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==================== CAMPAIGN ENDPOINTS ====================

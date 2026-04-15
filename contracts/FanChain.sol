@@ -103,7 +103,7 @@ contract FanChain is ERC721, Ownable {
     }
 
     // Simple test function - mint without signature
-    // TESTING VERSION
+    // TESTING VERSION - REMOVE IN PRODUCTION
     function mintTest(address _to, string calldata _tokenURI) external returns (uint256) {
         uint256 newTokenId = _tokenIds.current();
         _mint(_to, newTokenId);
@@ -113,6 +113,59 @@ contract FanChain is ERC721, Ownable {
         _tokenIds.increment();
         return newTokenId;
     }
+
+    // Signed minting - requires valid signature from backend
+    function mintWithSignature(
+        address _to,
+        uint256 _campaignId,
+        string calldata _tokenURI,
+        uint256 _lat,
+        uint256 _lng,
+        bytes calldata _signature
+    ) external returns (uint256) {
+        // Verify signature
+        bytes32 digest = keccak256(
+            abi.encode(
+                keccak256("MintRequest(address to,uint256 campaignId,string tokenURI,uint256 lat,uint256 lng,uint256 nonce)"),
+                _to,
+                _campaignId,
+                keccak256(bytes(_tokenURI)),
+                _lat,
+                _lng,
+                usedNonces[_to]
+            )
+        );
+        
+        // Verify signer is platform
+        require(ecrecover(digest, 27, 28, _signature) == platformWallet, "Invalid signature");
+        
+        // Mark nonce as used
+        usedNonces[_to]++;
+        
+        // Mint NFT
+        uint256 newTokenId = _tokenIds.current();
+        _mint(_to, newTokenId);
+        _setTokenURI(newTokenId, _tokenURI);
+        
+        // Store attendance
+        nfts[newTokenId] = AttendanceNFT({
+            tokenId: newTokenId,
+            owner: _to,
+            campaignId: _campaignId,
+            timestamp: block.timestamp,
+            lat: _lat,
+            lng: _lng,
+            influencerId: ""
+        });
+        
+        emit NFTMinted(newTokenId, _to, _campaignId);
+        _tokenIds.increment();
+        
+        return newTokenId;
+    }
+
+    // Nonce tracking for signed mints
+    mapping(address => uint256) public usedNonces;
 
     // Create new campaign
     function createCampaign(

@@ -32,22 +32,54 @@ const NFT_ABI = [
 async function mintNFTWithMetaMask(walletAddress, campaignId, stadiumName, lat, lng) {
   if (!window.ethereum) throw new Error('MetaMask not installed');
   
-  // Skip backend proof generation - use mintTest directly
   const provider = new ethers.BrowserProvider(window.ethereum);
   await provider.send('eth_requestAccounts', []);
   const signer = await provider.getSigner();
   
-  // Use env contract address directly
   const contract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
   
-  // Use simple test function
-  const tx = await contract.mintTest(
-    walletAddress,
-    `${BACKEND_URL}/nft/${Date.now()}`
-  );
-  
-  const receipt = await tx.wait();
-  return receipt.hash;
+  try {
+    // Try production signed mint first (requires backend signature)
+    const mintResponse = await fetch(`${BACKEND_URL}/mint`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: walletAddress,
+        campaignId,
+        tokenURI: `${BACKEND_URL}/nft/${campaignId}-${Date.now()}`,
+        lat,
+        lng
+      })
+    });
+    
+    const mintData = await mintResponse.json();
+    
+    if (mintData.success && mintData.signature) {
+      // Use signed mint (production)
+      const tx = await contract.mintWithSignature(
+        walletAddress,
+        campaignId,
+        mintData.message.tokenURI,
+        lat,
+        lng,
+        mintData.signature
+      );
+      return (await tx.wait()).hash;
+    }
+    
+    throw new Error('Backend signing failed');
+    
+  } catch (signErr) {
+    // Fallback to test mint if signature fails
+    console.warn('Signed mint failed, using test mint:', signErr.message);
+    
+    const tx = await contract.mintTest(
+      walletAddress,
+      `${BACKEND_URL}/nft/${campaignId}-${Date.now()}`
+    );
+    
+    return (await tx.wait()).hash;
+  }
 }
 
 // Haversine distance function
